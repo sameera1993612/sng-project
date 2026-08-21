@@ -937,6 +937,32 @@ body.admin-view .admin-project-action {
     letter-spacing: 0.16em;
 }
 
+.landing-partner-logos {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.landing-partner-logos div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 86px;
+    height: 42px;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid #d7e2e8;
+    border-radius: 0.55rem;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0.35rem 0.8rem rgba(16, 42, 67, 0.08);
+}
+
+.landing-partner-logos img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
 .landing-login-link {
     display: inline-flex;
     align-items: center;
@@ -1300,6 +1326,8 @@ body.admin-view .admin-project-action {
     .landing-footer { width: min(100% - 2rem, 520px); }
     .landing-brand span { font-size: 0.82rem; }
     .landing-brand small { font-size: 0.44rem; }
+    .landing-partner-logos { gap: 0.35rem; }
+    .landing-partner-logos div { width: 64px; height: 34px; padding: 0.3rem; }
     .landing-login-link { padding: 0.55rem 0.7rem; font-size: 0.8rem; }
     .landing-hero h1 { font-size: clamp(2.6rem, 14vw, 4rem); }
     .landing-actions { align-items: flex-start; flex-direction: column; }
