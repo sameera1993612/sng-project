@@ -1349,8 +1349,8 @@ body.admin-view .admin-project-action {
 
     .landing-hero-visual {
         min-height: 0 !important;
-        height: 105px !important;
-        max-height: 105px !important;
+        height: 190px !important;
+        max-height: 190px !important;
     }
 
     .landing-lead { max-width: 400px; margin-bottom: 0.25rem; }
