@@ -918,23 +918,16 @@ body.admin-view .admin-project-action {
     align-items: center;
     gap: 0.65rem;
     color: #102a43;
-    font-size: 1rem;
+    font-size: clamp(1.05rem, 2vw, 1.5rem);
     font-weight: 900;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
     text-decoration: none;
 }
 
 .landing-brand img {
     width: 2.6rem;
     height: 2.6rem;
-}
-
-.landing-brand small {
-    display: block;
-    margin-top: 0.15rem;
-    color: #648096;
-    font-size: 0.52rem;
-    letter-spacing: 0.16em;
 }
 
 .landing-partner-logos {
@@ -1324,8 +1317,7 @@ body.admin-view .admin-project-action {
     .landing-hero,
     .landing-dashboard-preview,
     .landing-footer { width: min(100% - 2rem, 520px); }
-    .landing-brand span { font-size: 0.82rem; }
-    .landing-brand small { font-size: 0.44rem; }
+    .landing-brand { font-size: 0.58rem; }
     .landing-partner-logos { gap: 0.35rem; }
     .landing-partner-logos div { width: 64px; height: 34px; padding: 0.3rem; }
     .landing-login-link { padding: 0.55rem 0.7rem; font-size: 0.8rem; }
