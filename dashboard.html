@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Manage SNG projects, drawing progress, invoices, and issues in one workspace.">
+    <meta name="theme-color" content="#102a43">
+    <title>Dashboard - SNG Drawing Management System</title>
+    <link rel="icon" href="assets/brand/sng-mark.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.webmanifest">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="d-flex" style="height: 100vh;">
+        
+        <!-- Side Menu -->
+        <div class="app-sidebar bg-dark text-white p-3 d-flex flex-column">
+            <h4 class="app-brand text-warning text-center mb-3 fw-bold">SNG Drawing Management System</h4>
+            <img id="profileAvatar" class="profile-avatar d-none" alt="Profile photo">
+            <div class="text-light small text-center mb-4" id="userEmailDisplay"></div>
+            
+            <div class="nav flex-column nav-pills w-100">
+                <button type="button" class="nav-link active mb-2 text-start text-white" id="nav-home"><i class="bi bi-grid-1x2-fill sidebar-icon" aria-hidden="true"></i><span>Dashboard Summary</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-view"><i class="bi bi-folder2-open sidebar-icon" aria-hidden="true"></i><span>View Projects</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white admin-only-nav" id="nav-admin-projects" style="display: none;"><i class="bi bi-kanban-fill sidebar-icon" aria-hidden="true"></i><span>Manage Projects</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white admin-only-nav" id="nav-admin-reviews" style="display: none;"><i class="bi bi-clipboard2-check-fill sidebar-icon" aria-hidden="true"></i><span>Drawing Reviews</span><span id="adminReviewBadge" class="badge rounded-pill bg-danger ms-auto d-none">0</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-print"><i class="bi bi-printer-fill sidebar-icon" aria-hidden="true"></i><span>Print Pending</span><span id="printPendingBadge" class="badge rounded-pill bg-warning text-dark ms-auto d-none">0</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-add" style="display: none;"><i class="bi bi-plus-square-fill sidebar-icon" aria-hidden="true"></i><span>Add Project</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-user" style="display: none;"><i class="bi bi-person-plus-fill sidebar-icon" aria-hidden="true"></i><span>Add User</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-profile"><i class="bi bi-person-circle sidebar-icon" aria-hidden="true"></i><span>My Profile</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-update"><i class="bi bi-pencil-square sidebar-icon" aria-hidden="true"></i><span>Update Progress</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-issues"><i class="bi bi-exclamation-triangle-fill sidebar-icon" aria-hidden="true"></i><span>Issue Log</span></button>
+            </div>
+            
+            <button type="button" id="logoutBtn" class="btn btn-danger mt-auto"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Logout</button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-grow-1 p-4 bg-light overflow-auto">
+            <div id="loadingText" class="alert alert-warning text-center fw-bold loading-banner">දත්ත පරීක්ෂා කරමින් පවතී...</div>
+            <div id="floatingTableScrollbar" class="table-scroll-top d-none" aria-label="Scroll current list left or right">
+                <button id="floatingTableScrollLeft" type="button" aria-label="Scroll left">&lsaquo;</button>
+                <input id="floatingTableScrollRange" type="range" min="0" max="0" value="0" aria-label="Drag left or right to scroll the current list">
+                <button id="floatingTableScrollRight" type="button" aria-label="Scroll right">&rsaquo;</button>
+            </div>
+
+            <!-- 1. Home Section -->
+            <div id="homeSection" class="section-content">
+                <h2 class="mb-4 fw-bold text-secondary">Dashboard Summary</h2>
+                <div class="summary-toolbar">
+                    <div>
+                        <p class="text-muted mb-0" id="summaryScope">Projects started or completed by you</p>
+                    </div>
+                    <div class="btn-group" role="group" aria-label="Dashboard view">
+                        <button type="button" class="btn btn-outline-primary" id="allWorkBtn">All Work</button>
+                        <button type="button" class="btn btn-outline-primary active" id="myWorkBtn">My Work</button>
+                    </div>
+                </div>
+
+                <div class="summary-group">
+                    <h5 class="summary-heading">Projects</h5>
+                    <div class="row g-3">
+                        <div class="col-md-4"><div class="summary-card summary-card-pending"><span>Pending</span><strong id="projectPendingCount">0</strong></div></div>
+                        <div class="col-md-4"><div class="summary-card summary-card-ongoing"><span>Ongoing</span><strong id="projectOngoingCount">0</strong></div></div>
+                        <div class="col-md-4"><div class="summary-card summary-card-complete"><span>Complete</span><strong id="projectCompleteCount">0</strong></div></div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-1">
+                    <div class="col-lg-6">
+                        <div class="summary-group h-100">
+                            <h5 class="summary-heading">Invoices</h5>
+                            <div class="row g-3">
+                                <div class="col-4"><div class="summary-card summary-card-pending"><span>Pending</span><strong id="invoicePendingCount">0</strong></div></div>
+                                <div class="col-4"><div class="summary-card summary-card-ongoing"><span>Ongoing</span><strong id="invoiceOngoingCount">0</strong></div></div>
+                                <div class="col-4"><div class="summary-card summary-card-complete"><span>Complete</span><strong id="invoiceCompleteCount">0</strong></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="summary-group h-100">
+                            <h5 class="summary-heading">As-Built Drawings</h5>
+                            <div class="row g-3">
+                                <div class="col-4"><div class="summary-card summary-card-pending"><span>Pending</span><strong id="asbuiltPendingCount">0</strong></div></div>
+                                <div class="col-4"><div class="summary-card summary-card-ongoing"><span>Ongoing</span><strong id="asbuiltOngoingCount">0</strong></div></div>
+                                <div class="col-4"><div class="summary-card summary-card-complete"><span>Complete</span><strong id="asbuiltCompleteCount">0</strong></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <div class="col-md-6"><div class="summary-total"><span>Total Projects</span><strong id="totProjects">0</strong></div></div>
+                    <div class="col-md-6"><div class="summary-total"><span>Total Invoice Amount (Rs)</span><strong id="totValue">0.00</strong></div></div>
+                </div>
+                <div id="invoiceAmountBreakdown" class="summary-group mt-4">
+                    <h5 class="summary-heading">Invoice Amount by Status (Rs)</h5>
+                    <div class="row g-3">
+                        <div class="col-md-4"><div class="summary-total summary-total-pending"><span>Pending</span><strong id="invoicePendingAmount">0.00</strong></div></div>
+                        <div class="col-md-4"><div class="summary-total summary-total-ongoing"><span>Ongoing</span><strong id="invoiceOngoingAmount">0.00</strong></div></div>
+                        <div class="col-md-4"><div class="summary-total summary-total-complete"><span>Completed</span><strong id="invoiceCompleteAmount">0.00</strong></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. View Projects Section -->
+            <div id="viewSitesSection" class="section-content d-none">
+                <h2 class="mb-4 fw-bold text-secondary">All Projects List</h2>
+                <div class="card shadow border-0 rounded-4">
+                    <div class="card-body p-4 project-list-wrapper">
+                        <table class="table table-hover align-middle project-list-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Project Name</th>
+                                    <th>Project Details</th>
+                                    <th>Location (RTOM/LEA)</th>
+                                    <th>Type</th>
+                                    <th>Invoice Status</th>
+                                    <th>As-Built Status</th>
+                                    <th>Admin Review</th>
+                                    <th id="projectActionsHeader" class="admin-project-action">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="projectsTableBody">
+                                <!-- Data will load here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2.3 Print Pending Section -->
+            <div id="printSection" class="section-content d-none">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                    <div>
+                        <p class="section-eyebrow mb-1">FINAL HANDOFF</p>
+                        <h2 class="mb-1 fw-bold text-secondary">Print Pending</h2>
+                        <p class="text-muted mb-0">Print only the drawings you completed after admin approval.</p>
+                    </div>
+                    <span class="print-page-icon"><i class="bi bi-printer-fill" aria-hidden="true"></i></span>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4"><div class="print-summary-card"><span>Pending Prints</span><strong id="printPendingJobCount">0</strong></div></div>
+                    <div class="col-md-4"><div class="print-summary-card"><span>Invoice Value (Rs)</span><strong id="printPendingValue">0.00</strong></div></div>
+                    <div class="col-md-4"><div class="print-summary-card"><span>Completed Jobs</span><strong id="printCompletedJobCount">0</strong></div></div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-xl-6">
+                        <div class="print-job-panel print-job-panel-invoice">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                <div><h5 class="fw-bold mb-1">Invoice Drawings</h5><p class="small text-muted mb-0">Your approved invoice drawing jobs</p></div>
+                                <span id="invoicePrintCount" class="print-job-count">0 jobs</span>
+                            </div>
+                            <div id="invoicePrintList"></div>
+                        </div>
+                    </div>
+                    <div class="col-xl-6">
+                        <div class="print-job-panel print-job-panel-asbuilt">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                <div><h5 class="fw-bold mb-1">As-Built Drawings</h5><p class="small text-muted mb-0">Your approved as-built drawing jobs</p></div>
+                                <span id="asbuiltPrintCount" class="print-job-count">0 jobs</span>
+                            </div>
+                            <div id="asbuiltPrintList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2.1 Admin Project Management Section -->
+            <div id="adminProjectsSection" class="section-content d-none">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                    <div>
+                        <h2 class="mb-1 fw-bold text-secondary">Manage Projects</h2>
+                        <p class="text-muted mb-0">Search, review, modify, or delete project records.</p>
+                    </div>
+                    <button id="adminRefreshProjectsBtn" type="button" class="btn btn-outline-primary">Refresh Projects</button>
+                </div>
+                <div class="card shadow border-0 rounded-4">
+                    <div class="card-body p-4">
+                        <div class="row g-3 mb-4">
+                            <div class="col-lg-8">
+                                <label class="form-label fw-bold" for="adminProjectSearchInput">Search projects</label>
+                                <input type="search" id="adminProjectSearchInput" class="form-control" placeholder="Project name, project no, PO, invoice ref, RTOM or LEA" autocomplete="off">
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label fw-bold" for="adminInvoiceStatusFilter">Invoice Drawing Status</label>
+                                <select id="adminInvoiceStatusFilter" class="form-select">
+                                    <option value="all">All statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="preparing">Preparing</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label fw-bold" for="adminAsbuiltStatusFilter">As-Built Status</label>
+                                <select id="adminAsbuiltStatusFilter" class="form-select">
+                                    <option value="all">All statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="preparing">Preparing</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="admin-bulk-toolbar d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="adminSelectAllProjects">
+                                <label class="form-check-label fw-semibold" for="adminSelectAllProjects">Select all visible projects</label>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <span id="adminSelectedProjectsCount" class="small text-muted">0 projects selected</span>
+                                <button id="adminDeleteSelectedBtn" type="button" class="btn btn-sm btn-danger" disabled><i class="bi bi-trash3-fill me-1" aria-hidden="true"></i>Delete selected</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive admin-project-table-wrapper">
+                            <table class="table table-hover align-middle admin-project-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th class="admin-select-column">Select</th>
+                                        <th>Project</th>
+                                        <th>References</th>
+                                        <th>Location</th>
+                                        <th>Invoice</th>
+                                        <th>As-Built</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminProjectsTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="adminProjectsEmptyState" class="text-center text-muted py-4 d-none">No projects match your search.</div>
+                        <div id="adminEditProjectPanel" class="edit-project-panel mt-4 d-none">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                <h5 class="fw-bold text-primary mb-0">Modify Project Details</h5>
+                                <button id="cancelEditProjectBtn" type="button" class="btn btn-sm btn-outline-secondary">Close</button>
+                            </div>
+                            <input type="hidden" id="editProjectId">
+                            <div class="row g-3">
+                                <div class="col-md-6"><label class="form-label fw-bold">Region</label><input id="editRegion" class="form-control"></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Province</label><input id="editProvince" class="form-control"></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">RTOM</label><input id="editRtom" class="form-control"></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">LEA</label><input id="editLea" class="form-control"></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Project Type</label><input id="editProjectType" class="form-control"></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Project Name</label><input id="editProjectName" class="form-control"></div>
+                                <div class="col-md-4"><label class="form-label fw-bold">Invoice Ref Number</label><input id="editInvoiceRef" class="form-control"></div>
+                                <div class="col-md-4"><label class="form-label fw-bold">Project No</label><input id="editProjectNo" class="form-control"></div>
+                                <div class="col-md-4"><label class="form-label fw-bold">SLT/Request Ref</label><input id="editSltRef" class="form-control"></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">PO Number</label><input id="editPoNumber" class="form-control"></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Invoice Amount</label><input id="editInvoiceAmount" type="number" class="form-control"></div>
+                            </div>
+                            <div class="mt-3 d-flex gap-2">
+                                <button id="saveEditProjectBtn" type="button" class="btn btn-primary">Save Changes</button>
+                            </div>
+                            <div id="editProjectStatus" class="small mt-2" role="status"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2.2 Admin Drawing Review Section -->
+            <div id="adminReviewsSection" class="section-content d-none">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                    <div>
+                        <h2 class="mb-1 fw-bold text-secondary">Drawing Reviews</h2>
+                        <p class="text-muted mb-0">Check drawings completed by users and send feedback when changes are needed.</p>
+                    </div>
+                    <button id="adminRefreshReviewsBtn" type="button" class="btn btn-outline-primary">Refresh Reviews</button>
+                </div>
+                <div id="adminReviewNotice" class="alert alert-warning d-none" role="status"></div>
+                <div class="card shadow border-0 rounded-4">
+                    <div class="card-body p-4 table-responsive admin-review-table-wrapper">
+                        <table class="table table-hover align-middle admin-review-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Drawing</th>
+                                    <th>Completed By</th>
+                                    <th>Completed Date</th>
+                                    <th>Review</th>
+                                    <th>Comment</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminReviewsTableBody"></tbody>
+                        </table>
+                        <div id="adminReviewsEmptyState" class="text-center text-muted py-4 d-none">No completed drawings are waiting for review.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Add Project Section -->
+            <div id="addSiteSection" class="section-content d-none">
+                <h2 class="mb-4 fw-bold text-secondary">Add New Site / Project</h2>
+                <div class="card shadow border-0 rounded-4">
+                    <div class="card-body p-4">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Region:</label>
+                                <select id="regSelect" class="form-select"><option value="">-- Select --</option></select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Province:</label>
+                                <select id="provSelect" class="form-select" disabled><option value="">-- Select --</option></select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">RTOM:</label>
+                                <select id="rtomSelect" class="form-select" disabled><option value="">-- Select --</option></select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">LEA:</label>
+                                <select id="leaSelect" class="form-select" disabled><option value="">-- Select --</option></select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Project Type:</label>
+                            <select id="pType" class="form-select">
+                                <option value="Additional">Additional</option>
+                                <option value="Civil Work">Civil Work</option>
+                                <option value="Cluster">Cluster</option>
+                                <option value="CR">CR</option>
+                                <option value="DIS">DIS</option>
+                                <option value="Fault clearance">Fault clearance</option>
+                                <option value="FSSD">FSSD</option>
+                                <option value="FTTB">FTTB</option>
+                                <option value="HRB">HRB</option>
+                                <option value="MH-CA">MH-CA</option>
+                                <option value="MKT">MKT</option>
+                                <option value="MSAN">MSAN</option>
+                                <option value="OF">OF</option>
+                                <option value="OF-FTTH">OF-FTTH</option>
+                                <option value="Pole Shifting">Pole Shifting</option>
+                                <option value="PON">PON</option>
+                                <option value="RDA Related">RDA Related</option>
+                                <option value="Rehabilitation">Rehabilitation</option>
+                                <option value="SHIFTING">SHIFTING</option>
+                                <option value="SSD">SSD</option>
+                                <option value="SWF">SWF</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Project Name:</label>
+                            <input type="text" id="pName" class="form-control" placeholder="Project Name / Description">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">PO Number:</label>
+                                <input type="text" id="poNum" class="form-control" placeholder="e.g. 24506984">
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <label class="form-label fw-bold">Invoice Amount (Without TAX):</label>
+                                <input type="number" id="pAmount" class="form-control" placeholder="e.g. 167471">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Invoice Ref Number:</label>
+                                <input type="text" id="invoiceRefNum" class="form-control" placeholder="Invoice reference">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Project No:</label>
+                                <input type="text" id="projectNo" class="form-control" placeholder="Project number">
+                            </div>
+                            <div class="col-md-4 mb-4">
+                                <label class="form-label fw-bold">SLT Ref/Request Ref Number:</label>
+                                <input type="text" id="sltRefNum" class="form-control" placeholder="SLT or request reference">
+                            </div>
+                        </div>
+                        <button id="addSiteBtn" class="btn btn-warning w-100 fw-bold">Save Project</button>
+                        <div class="excel-import-panel mt-4 pt-4 border-top">
+                            <h5 class="fw-bold text-secondary">Bulk Add Projects with Excel</h5>
+                            <p class="text-muted small mb-3">Download the template, add one or more project rows, then upload the completed file.</p>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <button id="downloadTemplateBtn" type="button" class="btn btn-outline-success">⬇ Download Excel Template</button>
+                                <label for="excelFileInput" class="visually-hidden">Choose Excel file</label>
+                                <input id="excelFileInput" type="file" class="form-control excel-file-input" accept=".xlsx,.xls" aria-label="Choose Excel file">
+                                <button id="uploadExcelBtn" type="button" class="btn btn-primary">⬆ Add Projects</button>
+                            </div>
+                            <div id="excelUploadStatus" class="small mt-3" role="status"></div>
+                            <div class="mt-4 pt-3 border-top">
+                                <button id="removeDuplicateProjectsBtn" type="button" class="btn btn-outline-danger">🧹 Remove Duplicate Projects</button>
+                                <div id="duplicateCleanupStatus" class="small mt-2" role="status"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Update Progress Section -->
+            <div id="updateSiteSection" class="section-content d-none">
+                <div class="update-page-heading mb-4">
+                    <div>
+                        <p class="section-eyebrow mb-1">WORK QUEUE</p>
+                        <h2 class="mb-1 fw-bold text-secondary">Update Drawing Progress</h2>
+                        <p class="text-muted mb-0">Continue the projects you have started or choose new pending work.</p>
+                    </div>
+                    <span class="update-page-icon"><i class="bi bi-activity" aria-hidden="true"></i></span>
+                </div>
+                <div class="card shadow border-0 rounded-4">
+                    <div class="card-body p-4">
+                        <div class="active-work-panel mb-4">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                <div>
+                                    <h5 class="fw-bold mb-1">My Active Work</h5>
+                                    <p class="small text-muted mb-0">Projects currently started by you</p>
+                                </div>
+                                <span id="activeWorkCount" class="active-work-count">0 active</span>
+                            </div>
+                            <div id="activeWorkList" class="active-work-list"></div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="projectSelect">Choose another project</label>
+                            <input type="search" id="projectSearchInput" class="form-control mb-2" placeholder="Project name, Invoice Ref, Project No, PO No හෝ SLT Ref එකෙන් සොයන්න" autocomplete="off">
+                            <select id="projectSelect" class="form-select">
+                                <option value="">-- තෝරන්න --</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Actions Area -->
+                        <div id="actionArea" class="d-none">
+                            <h5 class="fw-bold text-primary mb-3" id="selProjName">Project Name</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-info">
+                                        <div class="card-header bg-info text-white fw-bold">Invoice Drawing Progress</div>
+                                        <div class="card-body text-center" id="invActionBody">
+                                            <!-- Buttons dynamically loaded here -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-secondary">
+                                        <div class="card-header bg-secondary text-white fw-bold">As-Built Drawing Progress</div>
+                                        <div class="card-body text-center" id="asbActionBody">
+                                            <!-- Buttons dynamically loaded here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="selectedProjectReview" class="review-feedback mt-3 d-none"></div>
+                            <div class="issue-entry-panel mt-3">
+                                <h6 class="fw-bold text-danger">Add Drawing Issue</h6>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-bold" for="issueType">Drawing</label>
+                                        <select id="issueType" class="form-select">
+                                            <option value="invoice">Invoice Drawing</option>
+                                            <option value="asbuilt">As-Built Drawing</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-7">
+                                        <label class="form-label small fw-bold" for="issueText">Issue</label>
+                                        <textarea id="issueText" class="form-control" rows="2" placeholder="Describe the issue"></textarea>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button id="addIssueBtn" type="button" class="btn btn-danger w-100">Add Issue</button>
+                                    </div>
+                                </div>
+                                <div id="selectedProjectIssues" class="mt-3"></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Issue Log Section -->
+            <div id="issuesSection" class="section-content d-none">
+                <h2 class="mb-4 fw-bold text-secondary" id="issuesHeading">Issue Log</h2>
+                <div class="card shadow border-0 rounded-4">
+                    <div class="card-body p-4 table-responsive issue-table-wrapper">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Drawing</th>
+                                    <th>Issue</th>
+                                    <th>Added By</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="issuesTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Add User Section -->
+            <div id="addUserSection" class="section-content d-none">
+                <div class="account-page-heading mb-4">
+                    <div>
+                        <p class="section-eyebrow mb-1">ADMINISTRATION</p>
+                        <h2 class="mb-1 fw-bold text-secondary">Add New User</h2>
+                        <p class="text-muted mb-0">Create a secure account and assign the right access level.</p>
+                    </div>
+                    <span class="account-page-icon account-page-icon-warning"><i class="bi bi-person-plus-fill" aria-hidden="true"></i></span>
+                </div>
+                <div class="card shadow border-0 rounded-4 account-form-card">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="form-section-title"><i class="bi bi-person-badge-fill" aria-hidden="true"></i><span>Account details</span></div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="newUserEmail">User Email:</label>
+                            <input type="email" id="newUserEmail" class="form-control" placeholder="user@example.com" autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="newUserPassword">Temporary Password:</label>
+                            <input type="password" id="newUserPassword" class="form-control" minlength="6" placeholder="Minimum 6 characters" autocomplete="new-password">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="newUserRole">Role:</label>
+                            <select id="newUserRole" class="form-select">
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                                <option value="viewer">Viewer (Read-only)</option>
+                                <option value="superadmin">Super Admin</option>
+                            </select>
+                        </div>
+                        <button id="addUserBtn" type="button" class="btn btn-warning w-100 fw-bold account-submit-button"><i class="bi bi-person-check-fill me-2" aria-hidden="true"></i>Create User</button>
+                        <div id="addUserStatus" class="small mt-3" role="status"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. User Profile Section -->
+            <div id="profileSection" class="section-content d-none">
+                <div class="account-page-heading mb-4">
+                    <div>
+                        <p class="section-eyebrow mb-1">YOUR ACCOUNT</p>
+                        <h2 class="mb-1 fw-bold text-secondary">My Profile</h2>
+                        <p class="text-muted mb-0">Keep your personal and workplace details up to date.</p>
+                    </div>
+                    <span class="account-page-icon"><i class="bi bi-person-vcard-fill" aria-hidden="true"></i></span>
+                </div>
+                <div class="card shadow border-0 rounded-4 account-form-card account-profile-card">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="profile-form-banner">
+                            <span class="profile-form-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
+                            <div>
+                                <h5 class="mb-1 fw-bold">Personal information</h5>
+                                <p class="small text-muted mb-0">This information appears in your workspace profile.</p>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="profileName">Full Name:</label>
+                                <input type="text" id="profileName" class="form-control" autocomplete="name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="profileBirthday">Birthday:</label>
+                                <input type="date" id="profileBirthday" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="profileEmployeeNumber">Employee Number:</label>
+                                <input type="text" id="profileEmployeeNumber" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="profileDesignation">Designation:</label>
+                                <input type="text" id="profileDesignation" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="profilePhone">Phone Number:</label>
+                                <input type="tel" id="profilePhone" class="form-control" autocomplete="tel">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="profilePhoto">Profile Photo:</label>
+                                <input type="file" id="profilePhoto" class="form-control" accept="image/*">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold" for="profileAddress">Address:</label>
+                                <textarea id="profileAddress" class="form-control" rows="3" autocomplete="street-address"></textarea>
+                            </div>
+                        </div>
+                        <button id="saveProfileBtn" type="button" class="btn btn-primary mt-4 account-submit-button"><i class="bi bi-check2-circle me-2" aria-hidden="true"></i>Save Profile</button>
+                        <div id="profileStatus" class="small mt-3" role="status"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- JavaScript ෆයිල් එක -->
+    <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

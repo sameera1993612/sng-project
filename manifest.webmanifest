@@ -1,0 +1,17 @@
+{
+  "name": "SNG Drawing Management System",
+  "short_name": "SNG Drawings",
+  "description": "Project, invoice drawing, and as-built drawing management workspace.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#102a43",
+  "icons": [
+    {
+      "src": "assets/brand/sng-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

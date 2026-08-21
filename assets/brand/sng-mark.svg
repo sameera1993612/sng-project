@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>SNG Drawing Management System</title>
+  <rect width="64" height="64" rx="14" fill="#102a43"/>
+  <path d="M17 18h30v7H25v6h16c4 0 7 3 7 7v2c0 4-3 7-7 7H17v-7h22v-2H23c-4 0-6-3-6-7v-6c0-4 2-7 6-7Z" fill="#f4b942"/>
+  <path d="M17 18h8v30h-8z" fill="#fff" opacity=".92"/>
+</svg>

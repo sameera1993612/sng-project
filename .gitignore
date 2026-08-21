@@ -1,0 +1,17 @@
+# Local and generated files
+.DS_Store
+Thumbs.db
+.vscode/
+node_modules/
+dist/
+build/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+firebase-debug.log
+
+# Temporary exports
+*.tmp
+*.log

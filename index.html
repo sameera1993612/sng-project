@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SNG telecom drawing, project progress, invoice, and as-built management workspace.">
+    <meta name="theme-color" content="#102a43">
+    <title>SNG Drawing Management System</title>
+    <link rel="icon" href="assets/brand/sng-mark.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="landing-page">
+    <header class="landing-nav">
+        <a class="landing-brand" href="index.html" aria-label="SNG home"><img src="assets/brand/sng-mark.svg" alt="SNG"><span>SNG <small>DRAWING MANAGEMENT</small></span></a>
+    </header>
+    <main>
+        <section class="landing-hero">
+            <div class="landing-hero-copy">
+                <p class="landing-kicker">TELECOM NETWORK OPERATIONS</p>
+                <h1>From field survey<br>to <strong>final drawing.</strong></h1>
+                <p class="landing-lead">A single operational view for OSP projects, invoice drawings, field progress, and as-built delivery.</p>
+                <div class="landing-actions"><a class="landing-primary-button" href="login.html"><i class="bi bi-arrow-right-circle-fill me-2" aria-hidden="true"></i>Open workspace</a><span class="landing-status"><i class="bi bi-broadcast-pin" aria-hidden="true"></i> Network workspace online</span></div>
+            </div>
+            <div class="landing-hero-visual" aria-label="Telecom project dashboard preview"><div class="network-line network-line-one"></div><div class="network-line network-line-two"></div><div class="hero-visual-label"><i class="bi bi-diagram-3-fill" aria-hidden="true"></i> OSP CONTROL ROOM</div><div class="hero-visual-grid"><span>FIELD DRAWINGS</span><span>ACTIVE DELIVERY</span><span>AS-BUILT READY</span></div></div>
+        </section>
+        <section class="landing-dashboard-preview" aria-label="Dashboard overview">
+            <div class="preview-heading"><div><p class="landing-kicker">LIVE WORK OVERVIEW</p><h2>A clearer view of every connection.</h2></div><span id="liveSyncStatus" class="preview-sync"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Connecting to live data</span></div>
+            <div class="preview-metrics"><div class="preview-metric"><span>Active projects</span><strong id="liveActiveProjects">--</strong><small id="liveActiveMeta">Waiting for live data</small></div><div class="preview-metric"><span>Drawings in progress</span><strong id="liveDrawingsProgress">--</strong><small id="liveRegionsMeta">Waiting for live data</small></div><div class="preview-metric"><span>As-built completion</span><strong id="liveAsbuiltCompletion">--</strong><small id="liveAsbuiltMeta">Waiting for live data</small></div><div class="preview-metric"><span>Open issues</span><strong id="liveOpenIssues">--</strong><small id="liveIssuesMeta">Waiting for live data</small></div></div>
+            <div class="preview-charts">
+                <article class="preview-panel preview-bar-panel"><div class="preview-panel-heading"><div><h3>Project delivery</h3><p id="liveBarSubtitle">Live project distribution by region</p></div><i class="bi bi-bar-chart-fill" aria-hidden="true"></i></div><div id="liveBarChart" class="preview-bars" aria-label="Live bar chart showing project distribution by region"></div></article>
+                <article class="preview-panel preview-pie-panel"><div class="preview-panel-heading"><div><h3>Drawing status</h3><p>Current work distribution</p></div><i class="bi bi-pie-chart-fill" aria-hidden="true"></i></div><div class="preview-pie-content"><div id="livePieChart" class="preview-pie-chart" aria-label="Live pie chart showing drawing status"></div><div class="preview-legend"><span><i class="legend-dot legend-complete"></i>Complete <b id="liveCompletePercent">--</b></span><span><i class="legend-dot legend-progress"></i>In progress <b id="liveProgressPercent">--</b></span><span><i class="legend-dot legend-pending"></i>Pending <b id="livePendingPercent">--</b></span></div></div></article>
+            </div>
+        </section>
+    </main>
+    <footer class="landing-footer"><span>&copy; 2026 Sameera Nuwan Gunathunga</span><span>SLT / SLTS partner workspace</span></footer>
+    <script type="module" src="js/landing.js"></script>
+</body>
+</html>
