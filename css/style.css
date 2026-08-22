@@ -39,7 +39,7 @@ body > .d-flex > .flex-grow-1 {
     position: fixed;
     bottom: 1rem;
     right: 1.5rem;
-    left: calc(260px + 1.5rem);
+    left: calc(var(--sidebar-width, 260px) + 1.5rem);
     z-index: 1040;
     height: 42px;
     padding: 0.35rem 0.6rem;
@@ -78,11 +78,100 @@ body > .d-flex > .flex-grow-1 {
     .table-scroll-top { right: 0.75rem; left: 0.75rem; }
 }
 
+.project-report-panel {
+    padding: 1.25rem;
+    border: 1px solid #cbd5e1;
+    border-left: 4px solid #f4b942;
+    border-radius: 0.75rem;
+    background: #fffdf5;
+    box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.08);
+}
+
+.report-count {
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    color: #1d4e73;
+    background: #dbeafe;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.report-column-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+}
+
+.report-column-options .form-check {
+    min-width: 150px;
+}
+
 .app-sidebar {
-    flex: 0 0 260px;
-    width: 260px;
-    min-width: 260px;
+    --sidebar-width: 260px;
+    position: relative;
+    flex: 0 0 var(--sidebar-width);
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
     background: linear-gradient(180deg, #102a43 0%, #0b1f33 100%) !important;
+    transition: flex-basis 220ms ease, width 220ms ease, min-width 220ms ease, padding 220ms ease;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    top: 0.8rem;
+    right: 0.75rem;
+    z-index: 2;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 0.45rem;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-toggle:hover,
+.sidebar-toggle:focus-visible {
+    color: #102a43;
+    background: #f4b942;
+}
+
+.app-sidebar.is-collapsed {
+    --sidebar-width: 76px;
+    padding-right: 0.75rem !important;
+    padding-left: 0.75rem !important;
+}
+
+.app-sidebar.is-collapsed .app-brand,
+.app-sidebar.is-collapsed #userEmailDisplay,
+.app-sidebar.is-collapsed .nav-link span {
+    display: none;
+}
+
+.app-sidebar.is-collapsed .app-brand {
+    height: 2.25rem;
+    margin-bottom: 1.25rem !important;
+}
+
+.app-sidebar.is-collapsed .nav-link,
+.app-sidebar.is-collapsed #logoutBtn {
+    justify-content: center;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+}
+
+.app-sidebar.is-collapsed .nav-link {
+    gap: 0;
+}
+
+.app-sidebar.is-collapsed .sidebar-icon {
+    width: 1.35rem;
+    flex-basis: 1.35rem;
+    font-size: 1.15rem;
+}
+
+.app-sidebar.is-collapsed #logoutBtn .me-2 {
+    margin-right: 0 !important;
 }
 
 .app-sidebar .nav {

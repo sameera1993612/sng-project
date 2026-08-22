@@ -61,6 +61,23 @@ function showSection(sectionId, btnId) {
     requestAnimationFrame(setupFloatingTableScrollbar);
 }
 
+const sidebar = document.querySelector('.app-sidebar');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const savedSidebarState = localStorage.getItem('sng-sidebar-collapsed') === 'true';
+
+function setSidebarCollapsed(collapsed) {
+    sidebar.classList.toggle('is-collapsed', collapsed);
+    sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+    sidebarToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    sidebarToggle.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+    sidebarToggle.innerHTML = `<i class="bi bi-chevron-${collapsed ? 'right' : 'left'}" aria-hidden="true"></i>`;
+    localStorage.setItem('sng-sidebar-collapsed', String(collapsed));
+    requestAnimationFrame(setupFloatingTableScrollbar);
+}
+
+setSidebarCollapsed(savedSidebarState);
+sidebarToggle.addEventListener('click', () => setSidebarCollapsed(!sidebar.classList.contains('is-collapsed')));
+
 function setupFloatingTableScrollbar() {
     const floatingBar = document.getElementById("floatingTableScrollbar");
     const range = document.getElementById("floatingTableScrollRange");
@@ -742,6 +759,65 @@ function renderSummary(projects) {
 
 function formatAmount(amount) {
     return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const reportColumns = [
+    { key: 'projectName', label: 'Project Name', value: data => data.projectName || '' },
+    { key: 'projectNo', label: 'Project No', value: data => data.projectNo || '' },
+    { key: 'poNumber', label: 'PO Number', value: data => data.poNumber || '' },
+    { key: 'invoiceRefNumber', label: 'Invoice Ref', value: data => data.invoiceRefNumber || '' },
+    { key: 'sltRefNumber', label: 'SLT/Request Ref', value: data => data.sltRefNumber || '' },
+    { key: 'location', label: 'RTOM / LEA', value: data => `${data.rtom || ''} / ${data.lea || ''}` },
+    { key: 'projectType', label: 'Project Type', value: data => data.projectType || '' },
+    { key: 'invoiceStatus', label: 'Invoice Status', value: data => data.invoiceStatus || 'Pending' },
+    { key: 'asbuiltStatus', label: 'As-Built Status', value: data => data.asbuiltStatus || 'Pending' },
+    { key: 'invoiceAmount', label: 'Invoice Amount (Rs)', value: data => Number(data.invoiceAmount) || 0 },
+    { key: 'invoiceDrawnBy', label: 'Invoice Drawn By', value: data => data.invDrawnBy || '' },
+    { key: 'asbuiltDrawnBy', label: 'As-Built Drawn By', value: data => data.asbDrawnBy || '' }
+];
+
+function initProjectReportColumns() {
+    const container = document.getElementById('projectReportColumns');
+    if (!container || container.children.length) return;
+    container.innerHTML = reportColumns.map((column, index) => `<div class="form-check"><input class="form-check-input project-report-column" type="checkbox" value="${column.key}" id="report-column-${column.key}" ${index < 9 ? 'checked' : ''}><label class="form-check-label" for="report-column-${column.key}">${column.label}</label></div>`).join('');
+}
+
+function getProjectReportRows() {
+    const searchTerm = document.getElementById('projectReportSearch').value.trim().toLowerCase();
+    const invoiceFilter = document.getElementById('projectReportInvoiceStatus').value;
+    const asbuiltFilter = document.getElementById('projectReportAsbuiltStatus').value;
+    return Object.values(allProjectsData).filter(data => {
+        const searchableText = [data.projectName, data.projectNo, data.poNumber, data.invoiceRefNumber, data.sltRefNumber, data.rtom, data.lea].map(value => String(value || '').toLowerCase()).join(' ');
+        return (!searchTerm || searchableText.includes(searchTerm)) &&
+            (invoiceFilter === 'all' || (data.invoiceStatus || 'Pending') === invoiceFilter) &&
+            (asbuiltFilter === 'all' || (data.asbuiltStatus || 'Pending') === asbuiltFilter);
+    });
+}
+
+function updateProjectReportCount() {
+    const count = getProjectReportRows().length;
+    document.getElementById('projectReportCount').innerText = `${count} project${count === 1 ? '' : 's'}`;
+}
+
+function downloadProjectReport() {
+    if (!isAdmin) return;
+    const selectedKeys = [...document.querySelectorAll('.project-report-column:checked')].map(input => input.value);
+    const columns = reportColumns.filter(column => selectedKeys.includes(column.key));
+    const status = document.getElementById('projectReportStatus');
+    if (!columns.length) {
+        status.className = 'small mt-2 text-danger';
+        status.innerText = 'Select at least one report column.';
+        return;
+    }
+    const rows = getProjectReportRows().map(data => Object.fromEntries(columns.map(column => [column.label, column.value(data)])));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Project Report');
+    const format = document.getElementById('projectReportFormat').value;
+    const filename = `SNG_Project_Report_${new Date().toISOString().slice(0, 10)}.${format}`;
+    XLSX.writeFile(workbook, filename, { bookType: format });
+    status.className = 'small mt-2 text-success';
+    status.innerText = `${rows.length} project${rows.length === 1 ? '' : 's'} exported successfully.`;
 }
 
 onAuthStateChanged(auth, async (user) => {
