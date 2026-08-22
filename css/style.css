@@ -1472,3 +1472,12 @@ body.admin-view .admin-project-action {
         border-width: 10px;
     }
 }
+/* Collapse වෙද්දී Menu එක පහළට කිරීම */
+.app-sidebar.is-collapsed .nav {
+    margin-top: 3.5rem; 
+}
+
+/* Collapse වෙද්දී Logout අකුරු සැඟවීම */
+.app-sidebar.is-collapsed #logoutBtn span {
+    display: none; 
+}
