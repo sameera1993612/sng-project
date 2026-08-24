@@ -40,7 +40,7 @@
                 <button type="button" class="nav-link mb-2 text-start text-white admin-only-nav" id="nav-admin-reviews" style="display: none;"><i class="bi bi-clipboard2-check-fill sidebar-icon" aria-hidden="true"></i><span>Drawing Reviews</span><span id="adminReviewBadge" class="badge rounded-pill bg-danger ms-auto d-none">0</span></button>
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-print"><i class="bi bi-printer-fill sidebar-icon" aria-hidden="true"></i><span>Print Pending</span><span id="printPendingBadge" class="badge rounded-pill bg-warning text-dark ms-auto d-none">0</span></button>
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-add" style="display: none;"><i class="bi bi-plus-square-fill sidebar-icon" aria-hidden="true"></i><span>Add Project</span></button>
-                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-user" style="display: none;"><i class="bi bi-person-plus-fill sidebar-icon" aria-hidden="true"></i><span>Add User</span></button>
+                <button type="button" class="nav-link mb-2 text-start text-white" id="nav-user" style="display: none;"><i class="bi bi-people-fill sidebar-icon" aria-hidden="true"></i><span>User Management</span></button>
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-profile"><i class="bi bi-person-circle sidebar-icon" aria-hidden="true"></i><span>My Profile</span></button>
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-issues"><i class="bi bi-exclamation-triangle-fill sidebar-icon" aria-hidden="true"></i><span>Issue Log</span></button>
             </div>
@@ -270,12 +270,12 @@
                                 <thead class="table-dark">
                                     <tr>
                                         <th class="admin-select-column">Select</th>
-                                        <th>Project</th>
+                                        <th>Actions</th>
                                         <th>References</th>
                                         <th>Location</th>
                                         <th>Invoice</th>
                                         <th>As-Built</th>
-                                        <th>Actions</th>
+                                        <th>Project</th>
                                     </tr>
                                 </thead>
                                 <tbody id="adminProjectsTableBody"></tbody>
@@ -670,38 +670,63 @@
                 </div>
             </div>
 
-            <!-- 6. Add User Section -->
+            <!-- 6. User Management Section -->
             <div id="addUserSection" class="section-content d-none">
                 <div class="account-page-heading mb-4">
                     <div>
                         <p class="section-eyebrow mb-1">ADMINISTRATION</p>
-                        <h2 class="mb-1 fw-bold text-secondary">Add New User</h2>
-                        <p class="text-muted mb-0">Create a secure account and assign the right access level.</p>
+                        <h2 class="mb-1 fw-bold text-secondary">User Management</h2>
+                        <p class="text-muted mb-0">Create new accounts, update roles, or manage system users.</p>
                     </div>
-                    <span class="account-page-icon account-page-icon-warning"><i class="bi bi-person-plus-fill" aria-hidden="true"></i></span>
+                    <span class="account-page-icon account-page-icon-warning"><i class="bi bi-people-fill" aria-hidden="true"></i></span>
                 </div>
-                <div class="card shadow border-0 rounded-4 account-form-card">
-                    <div class="card-body p-4 p-md-5">
-                        <div class="form-section-title"><i class="bi bi-person-badge-fill" aria-hidden="true"></i><span>Account details</span></div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold" for="newUserEmail">User Email:</label>
-                            <input type="email" id="newUserEmail" class="form-control" placeholder="user@example.com" autocomplete="off">
+
+                <div class="card shadow border-0 rounded-4 account-form-card mb-4">
+                    <div class="card-body p-4 p-md-4">
+                        <div class="form-section-title"><i class="bi bi-person-plus-fill" aria-hidden="true"></i><span>Add New User</span></div>
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold" for="newUserEmail">User Email:</label>
+                                <input type="email" id="newUserEmail" class="form-control" placeholder="user@example.com" autocomplete="off">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold" for="newUserPassword">Temporary Password:</label>
+                                <input type="password" id="newUserPassword" class="form-control" minlength="6" placeholder="Min 6 characters" autocomplete="new-password">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold" for="newUserRole">Role:</label>
+                                <select id="newUserRole" class="form-select">
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="viewer">Viewer (Read-only)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button id="addUserBtn" type="button" class="btn btn-warning w-100 fw-bold"><i class="bi bi-person-check-fill me-1" aria-hidden="true"></i>Create</button>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold" for="newUserPassword">Temporary Password:</label>
-                            <input type="password" id="newUserPassword" class="form-control" minlength="6" placeholder="Minimum 6 characters" autocomplete="new-password">
+                        <div id="addUserStatus" class="small mt-2" role="status"></div>
+                    </div>
+                </div>
+
+                <div class="card shadow border-0 rounded-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-list-columns me-2"></i>Existing System Users</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>User Email</th>
+                                        <th>Full Name</th>
+                                        <th>Role</th>
+                                        <th>Actions (Role / Password / Delete)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <!-- Users loaded dynamically -->
+                                </tbody>
+                            </table>
                         </div>
-                        <div class="mb-4">
-                            <label class="form-label fw-bold" for="newUserRole">Role:</label>
-                            <select id="newUserRole" class="form-select">
-                                <option value="user">User</option>
-                                <option value="admin">Admin</option>
-                                <option value="viewer">Viewer (Read-only)</option>
-                                <option value="superadmin">Super Admin</option>
-                            </select>
-                        </div>
-                        <button id="addUserBtn" type="button" class="btn btn-warning w-100 fw-bold account-submit-button"><i class="bi bi-person-check-fill me-2" aria-hidden="true"></i>Create User</button>
-                        <div id="addUserStatus" class="small mt-3" role="status"></div>
                     </div>
                 </div>
             </div>

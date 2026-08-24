@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { firebaseConfig } from "../config/firebase-config.js";
 
@@ -168,7 +168,11 @@ document.getElementById('nav-print').addEventListener('click', () => {
     renderPrintQueue();
 });
 document.getElementById('nav-add').addEventListener('click', () => showSection('addSiteSection', 'nav-add'));
-document.getElementById('nav-user').addEventListener('click', () => showSection('addUserSection', 'nav-user'));
+document.getElementById('nav-user').addEventListener('click', () => {
+    showSection('addUserSection', 'nav-user');
+    updateNewUserRoleOptions();
+    renderUsersTable();
+});
 document.getElementById('nav-profile').addEventListener('click', () => {
     showSection('profileSection', 'nav-profile');
     loadProfileForm();
@@ -348,6 +352,7 @@ async function loadDashboardData() {
     requestAnimationFrame(setupFloatingTableScrollbar);
 }
 
+// --- Manage Projects Table (Column Order: Select, Actions, References, Location, Invoice, As-Built, Project) ---
 function renderAdminProjects() {
     const tableBody = document.getElementById("adminProjectsTableBody");
     const emptyState = document.getElementById("adminProjectsEmptyState");
@@ -379,15 +384,15 @@ function renderAdminProjects() {
             <td class="text-center">
                 <input class="form-check-input admin-project-checkbox" type="checkbox" value="${escapeHtml(pid)}" aria-label="Select ${escapeHtml(data.projectName || "project")}" ${selectedAdminProjectIds.has(pid) ? "checked" : ""} onchange="toggleAdminProjectSelection(this)">
             </td>
-            <td class="fw-bold">${escapeHtml(data.projectName || "Unnamed project")}<br><small class="text-muted">PO: ${escapeHtml(data.poNumber || "-")}</small></td>
-            <td><small>Project No: ${escapeHtml(data.projectNo || "-")}<br>Invoice Ref: ${escapeHtml(data.invoiceRefNumber || "-")}</small></td>
-            <td>${escapeHtml(data.rtom || "-")} / ${escapeHtml(data.lea || "-")}</td>
-            <td>${getAdminStatusBadge(data.invoiceStatus)}</td>
-            <td>${getAdminStatusBadge(data.asbuiltStatus)}</td>
             <td class="text-nowrap">
                 <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="openEditProject('${pid}')">Modify</button>
                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteProject('${pid}')">Delete</button>
             </td>
+            <td><small>Project No: ${escapeHtml(data.projectNo || "-")}<br>Invoice Ref: ${escapeHtml(data.invoiceRefNumber || "-")}</small></td>
+            <td>${escapeHtml(data.rtom || "-")} / ${escapeHtml(data.lea || "-")}</td>
+            <td>${getAdminStatusBadge(data.invoiceStatus)}</td>
+            <td>${getAdminStatusBadge(data.asbuiltStatus)}</td>
+            <td class="fw-bold">${escapeHtml(data.projectName || "Unnamed project")}<br><small class="text-muted">PO: ${escapeHtml(data.poNumber || "-")}</small></td>
         </tr>
     `).join("");
     emptyState.classList.toggle("d-none", projects.length > 0);
@@ -517,26 +522,6 @@ window.printDrawing = function(pid, type) {
     printWindow.focus();
     printWindow.print();
     printedDrawingJobs.add(`${pid}:${type}`);
-};
-
-window.completePrint = async function(pid, type) {
-    if (!allProjectsData[pid] || !["invoice", "asbuilt"].includes(type)) return;
-    if (!printedDrawingJobs.has(`${pid}:${type}`)) {
-        alert("මුලින් Print button එක ඔබලා drawing එක print කරන්න.");
-        return;
-    }
-    const statusField = type === "invoice" ? "invoiceStatus" : "asbuiltStatus";
-    const nowStr = new Date().toISOString();
-    try {
-        await updateDoc(doc(db, "osp_projects", pid), { [statusField]: "Print Complete", [`${type}PrintStatus`]: "Print Complete", [`${type}PrintCompletedAt`]: nowStr });
-        allProjectsData[pid][statusField] = "Print Complete";
-        allProjectsData[pid][`${type}PrintStatus`] = "Print Complete";
-        allProjectsData[pid][`${type}PrintCompletedAt`] = nowStr;
-        renderPrintQueue();
-        loadDashboardData();
-    } catch (error) {
-        alert(`Print completion failed: ${error.message}`);
-    }
 };
 
 function renderSelectedProjectReview(pid) {
@@ -835,7 +820,7 @@ function renderSummary(projects) {
     document.getElementById("invoicePendingAmount").innerText = formatAmount(invoiceAmounts.Pending);
     document.getElementById("invoiceOngoingAmount").innerText = formatAmount(invoiceAmounts.Preparing);
     document.getElementById("invoiceCompleteAmount").innerText = formatAmount(invoiceAmounts.Completed);
-    document.getElementById("summaryScope").innerText = summaryMode === "all" ? "All project records" : "Projects started or completed by you";
+    document.getElementById("summaryScope").innerText = (isAdmin || isViewer()) ? "All project records" : "Projects started or completed by you";
 }
 
 function formatAmount(amount) {
@@ -868,6 +853,105 @@ window.renderMapProjectOptions = function() {
 
 document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
 
+// --- User Management Functions (Table Render, Role Update, Reset Password, Delete) ---
+async function renderUsersTable() {
+    const tableBody = document.getElementById("usersTableBody");
+    if (!tableBody || !isAdmin) return;
+
+    tableBody.innerHTML = "";
+    const allUserDocs = await getDocs(collection(db, "users"));
+    
+    allUserDocs.docs.forEach(userDoc => {
+        const uData = userDoc.data();
+        const docId = userDoc.id;
+        const email = uData.email || uData.userEmail || "";
+        const role = uData.role || "user";
+        const fullName = uData.fullName || "-";
+        
+        const isTargetSuperAdmin = email.toLowerCase() === "sameera1993612@gmail.com";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td class="fw-bold">${escapeHtml(email)} ${isTargetSuperAdmin ? '<span class="badge bg-danger ms-1">Super Admin</span>' : ''}</td>
+            <td>${escapeHtml(fullName)}</td>
+            <td>
+                <select class="form-select form-select-sm user-role-select" data-docid="${docId}" ${isTargetSuperAdmin ? 'disabled' : ''}>
+                    <option value="user" ${role === 'user' ? 'selected' : ''}>User</option>
+                    <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
+                    <option value="viewer" ${role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                </select>
+            </td>
+            <td class="text-nowrap">
+                ${!isTargetSuperAdmin ? `
+                    <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="resetUserPassword('${escapeHtml(email)}')"><i class="bi bi-key-fill me-1"></i>Reset Password</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSystemUser('${docId}', '${escapeHtml(email)}')"><i class="bi bi-trash-fill"></i></button>
+                ` : '<span class="text-muted small">Protected</span>'}
+            </td>
+        `;
+        tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll('.user-role-select').forEach(select => {
+        select.addEventListener('change', async function() {
+            const docId = this.dataset.docid;
+            const newRole = this.value;
+            try {
+                await updateDoc(doc(db, "users", docId), { role: newRole });
+                alert("යූසර්ගේ Role එක සාර්ථකව යාවත්කාලීන කළා!");
+                renderUsersTable();
+            } catch (error) {
+                alert("Role update failed: " + error.message);
+            }
+        });
+    });
+}
+
+window.resetUserPassword = async function(email) {
+    if (!isAdmin) return;
+    if (confirm(`අවවාදයි! '${email}' වෙත පාස්වර්ඩ් එක වෙනස් කරගැනීම සඳහා Reset Email එකක් යැවීමට අවශ්‍යද?`)) {
+        try {
+            await sendPasswordResetEmail(auth, email);
+            alert(`සාර්ථකයි! '${email}' වෙත පාස්වර්ඩ් රීසෙට් ලින්ක් එක ඊමේල් කර ඇත.`);
+        } catch (error) {
+            alert("Password reset failed: " + error.message);
+        }
+    }
+};
+
+window.deleteSystemUser = async function(docId, email) {
+    if (!isAdmin) return;
+    if (confirm(`අවවාදයි! '${email}' යූසර්ව සිස්ටම් එකෙන් ඉවත් කිරීමට අවශ්‍යද?`)) {
+        try {
+            await deleteDoc(doc(db, "users", docId));
+            alert("යූසර් සාර්ථකව ඉවත් කළා.");
+            renderUsersTable();
+        } catch (error) {
+            alert("Delete failed: " + error.message);
+        }
+    }
+};
+
+// --- Add User Role Options Control (Super Admin / Admin Restriction) ---
+function updateNewUserRoleOptions() {
+    const roleSelect = document.getElementById('newUserRole');
+    if (!roleSelect) return;
+    
+    const isSuperAdmin = currentUserEmail.toLowerCase() === "sameera1993612@gmail.com";
+    
+    if (isSuperAdmin) {
+        roleSelect.innerHTML = `
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+            <option value="viewer">Viewer (Read-only)</option>
+        `;
+    } else {
+        roleSelect.innerHTML = `
+            <option value="user">User</option>
+            <option value="viewer">Viewer (Read-only)</option>
+        `;
+    }
+}
+
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUserEmail = user.email;
@@ -894,7 +978,10 @@ onAuthStateChanged(auth, async (user) => {
         });
         currentUserRole = String(currentUserDoc?.data().role || "user").toLowerCase();
         isAdmin = ["admin", "superadmin"].includes(currentUserRole);
-        summaryMode = isAdmin ? "all" : "mine";
+        
+        // Viewer හෝ Admin සඳහා summaryMode එක "all" ලෙස සෙට් කරයි (සියලුම ප්‍රොජෙක්ට්ස් සාරාංශය පෙන්වීමට)
+        summaryMode = (isAdmin || isViewer()) ? "all" : "mine";
+        
         updateProfileDisplay();
         if (isAdmin) {
             document.body.classList.add('admin-view');
@@ -905,20 +992,21 @@ onAuthStateChanged(auth, async (user) => {
             document.getElementById("masterReportBtn")?.classList.remove("d-none");
         }
 
-        if (!isAdmin) {
+        if (!isAdmin && !isViewer()) {
             document.getElementById('invoiceAmountBreakdown').classList.add('d-none');
             document.getElementById('allWorkBtn').classList.add('d-none');
             document.getElementById('myWorkBtn').classList.add('active');
             document.getElementById('myWorkBtn').disabled = true;
-        }
-        if (isViewer()) {
+        } else if (isViewer()) {
+            // Viewer සඳහා බටන් සහ ටොගල් සැඟවීම (සියලුම ඩේටා පෙන්වයි)
+            document.getElementById('allWorkBtn').classList.add('d-none');
+            document.getElementById('myWorkBtn').classList.add('d-none');
             document.getElementById('nav-update').style.display = 'none';
             document.getElementById('nav-issues').style.display = 'flex';
         }
-        document.getElementById('allWorkBtn').classList.toggle('active', summaryMode === "all");
-        document.getElementById('myWorkBtn').classList.toggle('active', summaryMode === "mine");
+        
         showSection('homeSection', 'nav-home');
-        if (isAdmin && !projectListener) {
+        if ((isAdmin || isViewer()) && !projectListener) {
             projectListener = onSnapshot(collection(db, "osp_projects"), () => {
                 loadDashboardData();
             }, () => {
@@ -1097,7 +1185,7 @@ document.getElementById('saveEditProjectBtn').addEventListener('click', async ()
     }
 });
 
-document.getElementById('projectSearchInput').addEventListener('input', renderProjectOptions);
+document.getElementById('projectSearchInput')?.addEventListener('input', renderProjectOptions);
 
 function readProfilePhoto(file) {
     return new Promise((resolve, reject) => {
@@ -1158,17 +1246,24 @@ document.getElementById('saveProfileBtn').addEventListener('click', async () => 
     }
 });
 
-document.getElementById('addUserBtn').addEventListener('click', async () => {
+document.getElementById('addUserBtn')?.addEventListener('click', async () => {
     const status = document.getElementById('addUserStatus');
     const email = document.getElementById('newUserEmail').value.trim();
     const password = document.getElementById('newUserPassword').value;
     const role = document.getElementById('newUserRole').value;
 
     if (!isAdmin) { alert("User add කිරීම adminට පමණි."); return; }
-    if (role === "superadmin" && currentUserRole !== "superadmin") {
-        alert("Super Admin account එකක් create කරන්න Super Admin permission අවශ්‍යයි.");
+    
+    const isSuperAdmin = currentUserEmail.toLowerCase() === "sameera1993612@gmail.com";
+    if (role === "admin" && !isSuperAdmin) {
+        alert("Admin account එකක් create කිරීමේ බලය ඇත්තේ එකම సూపర్ Admin ට පමණි.");
         return;
     }
+    if (role === "superadmin") {
+        alert("Super Admin account එකක් create කළ නොහැක.");
+        return;
+    }
+
     if (!email || password.length < 6) {
         status.className = "small mt-3 text-danger";
         status.innerText = "Valid email එකක් සහ අවම characters 6ක password එකක් ඇතුළත් කරන්න.";
@@ -1187,13 +1282,14 @@ document.getElementById('addUserBtn').addEventListener('click', async () => {
         status.innerText = `${email} user account එක සාර්ථකව create කළා.`;
         document.getElementById('newUserEmail').value = "";
         document.getElementById('newUserPassword').value = "";
+        renderUsersTable();
     } catch (error) {
         status.className = "small mt-3 text-danger";
         status.innerText = `User create failed: ${error.message}`;
     }
 });
 
-document.getElementById('addSiteBtn').addEventListener('click', async () => {
+document.getElementById('addSiteBtn')?.addEventListener('click', async () => {
     const pReg = document.getElementById('regSelect').value;
     const pProv = document.getElementById('provSelect').value;
     const pRtom = document.getElementById('rtomSelect').value;
@@ -1222,7 +1318,7 @@ document.getElementById('addSiteBtn').addEventListener('click', async () => {
     } catch (e) { alert("Error: " + e.message); }
 });
 
-document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
+document.getElementById('downloadTemplateBtn')?.addEventListener('click', () => {
     if (!isAdmin) { alert("මෙය adminට පමණි."); return; }
 
     const headers = [[
@@ -1241,7 +1337,7 @@ document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
     XLSX.writeFile(workbook, "SNG_Drawing_Projects_Template.xlsx");
 });
 
-document.getElementById('uploadExcelBtn').addEventListener('click', async () => {
+document.getElementById('uploadExcelBtn')?.addEventListener('click', async () => {
     const fileInput = document.getElementById('excelFileInput');
     const status = document.getElementById('excelUploadStatus');
     const file = fileInput.files[0];
@@ -1325,7 +1421,7 @@ document.getElementById('uploadExcelBtn').addEventListener('click', async () => 
     }
 });
 
-document.getElementById('removeDuplicateProjectsBtn').addEventListener('click', async () => {
+document.getElementById('removeDuplicateProjectsBtn')?.addEventListener('click', async () => {
     const status = document.getElementById('duplicateCleanupStatus');
     if (!isAdmin) { alert("Duplicate cleanup adminට පමණි."); return; }
 
@@ -1359,7 +1455,7 @@ document.getElementById('removeDuplicateProjectsBtn').addEventListener('click', 
     }
 });
 
-document.getElementById('projectSelect').addEventListener('change', (e) => {
+document.getElementById('projectSelect')?.addEventListener('change', (e) => {
     const pid = e.target.value;
     const actionArea = document.getElementById('actionArea');
     if(!pid) { actionArea.classList.add('d-none'); return; }
@@ -1468,7 +1564,7 @@ window.forceCompleteTask = async function(pid, type) {
     }
 };
 
-document.getElementById('addIssueBtn').addEventListener('click', async () => {
+document.getElementById('addIssueBtn')?.addEventListener('click', async () => {
     if (isViewer()) { alert("Viewer accounts are read-only."); return; }
     const pid = document.getElementById('projectSelect').value;
     const issueType = document.getElementById('issueType').value;
@@ -1536,7 +1632,7 @@ window.updateTask = async function(pid, type, newStatus) {
     } catch (e) { alert("Error: " + e.message); }
 };
 
-document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => window.location.href = "login.html"));
+document.getElementById('logoutBtn')?.addEventListener('click', () => signOut(auth).then(() => window.location.href = "login.html"));
 
 window.downloadMasterReport = function() {
     if (!isAdmin) {
@@ -1663,7 +1759,8 @@ window.initMap = function() {
         let div = L.DomUtil.create('div', 'leaflet-control bg-white shadow-sm p-2 rounded border');
         div.style.width = '300px'; div.style.maxHeight = '70vh'; div.style.overflowY = 'auto';
         L.DomEvent.disableClickPropagation(div); L.DomEvent.disableScrollPropagation(div);
-        div.innerHTML = `
+        
+        let viewerDrawHTML = isViewer() ? '' : `
             <div class="mb-2 border-bottom pb-2">
                 <label class="small fw-bold text-success mb-1">✏️ Active Folder (Draw here):</label>
                 <div class="input-group input-group-sm">
@@ -1674,6 +1771,10 @@ window.initMap = function() {
                     <option value="Cable"><option value="FDP"><option value="FTC"><option value="MH"><option value="Pole"><option value="Road"><option value="Joint">
                 </datalist>
             </div>
+        `;
+
+        div.innerHTML = `
+            ${viewerDrawHTML}
             <div class="d-flex justify-content-between align-items-center mb-1 border-bottom pb-1">
                 <h6 class="fw-bold mb-0 text-secondary" style="font-size: 13px;"><i class="bi bi-layers"></i> Project Layers</h6>
                 <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="updateTreeControl()"><i class="bi bi-arrow-clockwise"></i></button>
@@ -1684,16 +1785,20 @@ window.initMap = function() {
     };
     customTreeControl.addTo(projectMap);
 
-    drawControl = new L.Control.Draw({
-        edit: { featureGroup: drawnItems, remove: false },
-        draw: { polygon: true, polyline: true, rectangle: false, circle: false, marker: true, circlemarker: false }
-    });
-    projectMap.addControl(drawControl);
+    // Viewer කෙනෙක් නම් Map Draw tools ලබා නොදීම
+    if (!isViewer()) {
+        drawControl = new L.Control.Draw({
+            edit: { featureGroup: drawnItems, remove: false },
+            draw: { polygon: true, polyline: true, rectangle: false, circle: false, marker: true, circlemarker: false }
+        });
+        projectMap.addControl(drawControl);
+    }
 
     projectMap.on(L.Draw.Event.CREATED, function (event) {
+        if (isViewer()) return;
         const layer = event.layer;
         if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
-        let targetFolder = document.getElementById('activeDrawFolder').value.trim() || "Other";
+        let targetFolder = document.getElementById('activeDrawFolder')?.value.trim() || "Other";
         userCreatedFolders.add(targetFolder); openFolders.add(targetFolder);
         layer.feature.properties.folder = targetFolder;
         layer.feature.properties.name = ""; 
@@ -1712,6 +1817,7 @@ window.initMap = function() {
 };
 
 window.renameFolder = function(e, oldName) {
+    if (isViewer()) return;
     e.stopPropagation(); e.preventDefault();
     let newName = prompt(`Rename folder '${oldName}' to:`, oldName);
     if(newName && newName.trim() !== "" && newName !== oldName) {
@@ -1719,33 +1825,50 @@ window.renameFolder = function(e, oldName) {
         currentStageLayers.forEach(l => { if(l.feature.properties.folder === oldName) l.feature.properties.folder = newName; });
         userCreatedFolders.delete(oldName); userCreatedFolders.add(newName);
         openFolders.delete(oldName); openFolders.add(newName);
-        if(document.getElementById('activeDrawFolder').value === oldName) document.getElementById('activeDrawFolder').value = newName;
+        if(document.getElementById('activeDrawFolder')?.value === oldName) document.getElementById('activeDrawFolder').value = newName;
         updateTreeControl();
     }
 };
 
 window.deleteFolder = function(e, folderName) {
+    if (isViewer()) return;
     e.stopPropagation(); e.preventDefault();
     if(confirm(`අවවාදයි! '${folderName}' ෆෝල්ඩරය සහ එහි ඇති සියලුම දත්ත මකා දැමීමට අවශ්‍යද?`)) {
         let layersToRemove = currentStageLayers.filter(l => l.feature.properties.folder === folderName);
         layersToRemove.forEach(l => drawnItems.removeLayer(l));
         currentStageLayers = currentStageLayers.filter(l => l.feature.properties.folder !== folderName);
         userCreatedFolders.delete(folderName); openFolders.delete(folderName);
-        if(document.getElementById('activeDrawFolder').value === folderName) document.getElementById('activeDrawFolder').value = "Cable";
+        if(document.getElementById('activeDrawFolder')?.value === folderName) document.getElementById('activeDrawFolder').value = "Cable";
         updateTreeControl();
     }
 };
 
 window.createNewFolder = function() {
+    if (isViewer()) return;
     let input = document.getElementById('activeDrawFolder');
+    if (!input) return;
     let fName = input.value.trim();
     if(fName) { userCreatedFolders.add(fName); openFolders.add(fName); updateTreeControl(); }
 };
-window.setActiveFolder = function(e, folderName) { e.stopPropagation(); document.getElementById('activeDrawFolder').value = folderName; updateTreeControl(); };
+window.setActiveFolder = function(e, folderName) { 
+    if (isViewer()) return;
+    e.stopPropagation(); 
+    let input = document.getElementById('activeDrawFolder');
+    if (input) input.value = folderName; 
+    updateTreeControl(); 
+};
 window.toggleFolderState = function(folderName, isOpen) { if(isOpen) openFolders.add(folderName); else openFolders.delete(folderName); };
-window.handleDragStart = function(e, id) { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; };
-window.allowDrop = function(e) { e.preventDefault(); };
+window.handleDragStart = function(e, id) { 
+    if (isViewer()) return;
+    e.dataTransfer.setData("text/plain", id); 
+    e.dataTransfer.effectAllowed = "move"; 
+};
+window.allowDrop = function(e) { 
+    if (isViewer()) return;
+    e.preventDefault(); 
+};
 window.handleDropFeature = function(e, targetFolder) {
+    if (isViewer()) return;
     e.preventDefault(); e.currentTarget.classList.remove('border-primary'); 
     let id = e.dataTransfer.getData("text/plain");
     if(id) {
@@ -1773,33 +1896,40 @@ window.updateTreeControl = function() {
         let checkboxState = isAllChecked ? 'checked' : '';
         let indeterminate = (!isAllChecked && isSomeChecked) ? 'data-indeterminate="true"' : '';
         let isActive = (cat === activeFolder);
+        
+        let viewerActions = isViewer() ? '' : `
+            <span class="ms-auto me-2">
+                <i class="bi bi-pencil-square text-primary ms-1" title="Rename" onclick="renameFolder(event, '${cat}')"></i>
+                <i class="bi bi-trash text-danger ms-1" title="Delete" onclick="deleteFolder(event, '${cat}')"></i>
+            </span>
+        `;
+
         html += `
-        <details ${openFolders.has(cat) ? 'open' : ''} ontoggle="toggleFolderState('${cat}', this.open)" class="mb-2 rounded border p-1 shadow-sm ${isActive ? 'bg-success-subtle border-success' : 'bg-light border-light'}" 
+        <details ${openFolders.has(cat) ? 'open' : ''} ontoggle="toggleFolderState('${cat}', this.open)" class="mb-2 rounded border p-1 shadow-sm ${isActive && !isViewer() ? 'bg-success-subtle border-success' : 'bg-light border-light'}" 
             ondragover="allowDrop(event); this.classList.add('border-primary');" ondragleave="this.classList.remove('border-primary');" ondrop="this.classList.remove('border-primary'); handleDropFeature(event, '${cat}')">
-            <summary class="fw-bold ${isActive ? 'text-success' : 'text-dark'}" style="cursor: pointer; user-select: none; list-style: none;">
+            <summary class="fw-bold ${isActive && !isViewer() ? 'text-success' : 'text-dark'}" style="cursor: pointer; user-select: none; list-style: none;">
                 <div class="d-inline-flex align-items-center w-100">
                     <input type="checkbox" class="folder-toggle me-2 form-check-input mt-0" data-folder="${cat}" ${checkboxState} ${indeterminate}> 
                     <span onclick="setActiveFolder(event, '${cat}')" class="d-flex align-items-center flex-grow-1" title="Set as active">
-                        <i class="bi ${groups[cat].length ? 'bi-folder2-open' : 'bi-folder'} ${isActive ? 'text-success' : 'text-warning'} me-1"></i> 
+                        <i class="bi ${groups[cat].length ? 'bi-folder2-open' : 'bi-folder'} ${isActive && !isViewer() ? 'text-success' : 'text-warning'} me-1"></i> 
                         <span class="text-truncate" style="max-width:90px;">${cat}</span> 
                     </span>
-                    <span class="ms-auto me-2">
-                        <i class="bi bi-pencil-square text-primary ms-1" title="Rename" onclick="renameFolder(event, '${cat}')"></i>
-                        <i class="bi bi-trash text-danger ms-1" title="Delete" onclick="deleteFolder(event, '${cat}')"></i>
-                    </span>
-                    <span class="badge ${isActive ? 'bg-success' : 'bg-secondary'}">${groups[cat].length}</span>
+                    ${viewerActions}
+                    <span class="badge ${isActive && !isViewer() ? 'bg-success' : 'bg-secondary'}">${groups[cat].length}</span>
                 </div>
             </summary>
-            <div class="ms-4 mt-1 border-start ps-2 border-2 ${isActive ? 'border-success' : ''}">
+            <div class="ms-4 mt-1 border-start ps-2 border-2 ${isActive && !isViewer() ? 'border-success' : ''}">
         `;
         groups[cat].forEach(layer => {
             let name = layer.feature?.properties?.name || "Unnamed Item";
             let lid = L.stamp(layer);
             let isChecked = drawnItems.hasLayer(layer) ? 'checked' : '';
+            let draggableAttr = isViewer() ? '' : `draggable="true" ondragstart="handleDragStart(event, ${lid})" style="cursor: grab;"`;
+            let gripIcon = isViewer() ? '' : `<i class="bi bi-grip-vertical text-muted me-1 small"></i>`;
             html += `
-                <div id="tree-item-${lid}" class="d-flex align-items-center mb-1 feature-item p-1 rounded" draggable="true" ondragstart="handleDragStart(event, ${lid})" style="cursor: grab;">
+                <div id="tree-item-${lid}" class="d-flex align-items-center mb-1 feature-item p-1 rounded" ${draggableAttr}>
                     <input type="checkbox" class="item-toggle me-2 form-check-input mt-0" data-id="${lid}" ${isChecked}>
-                    <i class="bi bi-grip-vertical text-muted me-1 small"></i>
+                    ${gripIcon}
                     <span class="text-truncate small text-secondary fw-semibold hover-primary flex-grow-1" style="cursor: pointer;" onclick="zoomToLayer(${lid})">${escapeHtml(name)}</span>
                 </div>
             `;
@@ -1841,6 +1971,7 @@ window.zoomToLayer = function(id) {
 };
 
 function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Active") {
+    let readOnly = isViewer() || isReadOnly;
     let props = (feature && feature.properties) ? feature.properties : {};
     let name = props.name || props.Name || "";
     let desc = props.desc || props.description || props.Description || "";
@@ -1877,7 +2008,7 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
     let popupContent = document.createElement('div');
     popupContent.style.minWidth = "260px";
 
-    if (isReadOnly) {
+    if (readOnly) {
         popupContent.innerHTML = `
             <h6 class="fw-bold mb-1 text-primary border-bottom pb-1">👁 ${escapeHtml(stageName)} Layer</h6>
             ${name ? `<div class="fw-bold text-dark mb-1">${escapeHtml(name)} ${lengthHtml}</div>` : ''}
@@ -2008,7 +2139,7 @@ function loadMapDataForProjectAndStage() {
                         if(!layer.feature) layer.feature = feature;
                         let fName = feature.properties.folder || "Other";
                         userCreatedFolders.add(fName); 
-                        bindFeaturePopup(layer, layer.feature, false, currentMapStage);
+                        bindFeaturePopup(layer, layer.feature, isViewer(), currentMapStage);
                         drawnItems.addLayer(layer); currentStageLayers.push(layer);
                     }
                 });
@@ -2036,7 +2167,8 @@ function loadMapDataForProjectAndStage() {
     updateTreeControl();
 }
 
-document.getElementById('saveMapBtn').addEventListener('click', async () => {
+document.getElementById('saveMapBtn')?.addEventListener('click', async () => {
+    if (isViewer()) { alert("Viewer accounts are read-only."); return; }
     if (!currentMapProject) { alert("කරුණාකර මුලින්ම Project එකක් තෝරන්න!"); return; }
     let allFeatures = { type: "FeatureCollection", features: [] };
     currentStageLayers.forEach(l => { if(l.toGeoJSON) allFeatures.features.push(l.toGeoJSON()); });
@@ -2050,7 +2182,8 @@ document.getElementById('saveMapBtn').addEventListener('click', async () => {
     } catch (error) { alert("Error saving map: " + error.message); }
 });
 
-document.getElementById('kmzUpload').addEventListener('change', function(e) {
+document.getElementById('kmzUpload')?.addEventListener('change', function(e) {
+    if (isViewer()) return;
     const file = e.target.files[0];
     if(!file) return;
     const fileUrl = URL.createObjectURL(file);
@@ -2059,7 +2192,7 @@ document.getElementById('kmzUpload').addEventListener('change', function(e) {
         kmzParser.on('load', function(event) {
             event.layer.eachLayer(function(l) {
                 if(!l.feature) l.feature = { type: "Feature", properties: {} };
-                let folderName = l.feature.properties.folder || document.getElementById('activeDrawFolder').value.trim() || "Uploaded";
+                let folderName = l.feature.properties.folder || document.getElementById('activeDrawFolder')?.value.trim() || "Uploaded";
                 l.feature.properties.folder = folderName;
                 l.feature.properties.color = (l instanceof L.Marker) ? '#e11d48' : '#3388ff';
                 l.feature.properties.weight = 3;
@@ -2082,7 +2215,7 @@ window.executeExport = function() {
     if (currentStageLayers.length === 0) { alert("Export කරන්න Data නැහැ."); return; }
     let scope = document.getElementById('exportScope').value;
     let format = document.getElementById('exportFormat').value;
-    let activeFolder = document.getElementById('activeDrawFolder').value.trim();
+    let activeFolder = document.getElementById('activeDrawFolder')?.value.trim() || "";
 
     let featuresToExport = [];
     currentStageLayers.forEach(l => {
@@ -2189,3 +2322,18 @@ window.renderMapProjectOptions = function() {
     });
 };
 document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
+
+function applyViewerMapRestrictions() {
+    if (isViewer()) {
+        document.getElementById('saveMapBtn')?.classList.add('d-none');
+        document.getElementById('kmzUpload')?.closest('div')?.classList.add('d-none');
+    }
+}
+
+const originalShowSection = showSection;
+window.showSection = function(sectionId, btnId) {
+    originalShowSection(sectionId, btnId);
+    if (sectionId === 'mapSection') {
+        applyViewerMapRestrictions();
+    }
+};
