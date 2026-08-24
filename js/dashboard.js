@@ -27,31 +27,67 @@ const canManageWorkspace = () => isAdmin;
 // --- Excel Mapping Data ---
 const mappingData = {"METRO": {"METRO-1": {"HK": ["HAV", "HK", "KPT", "NAR", "WEL"], "KX": ["AN", "BAT", "HC", "IDH", "JLT", "KDL", "KOT", "KX", "MAB", "MDW", "MLE", "NAW", "PAL", "TAL", "TAN", "WI"], "MD": ["CEN", "CHR", "MD", "MTK", "SI", "WE"]}, "METRO-2": {"HO": ["AW", "HO", "KOM", "MGA", "MTG", "PK", "PNG", "RKG"], "ND": ["BS", "EMU", "GNA", "KAU", "KIR", "MHG", "ND"], "RM": ["BAK", "BOK", "EGD", "HON", "MAK", "MF", "MLP", "MRA", "MV", "PYL", "RAW", "RM", "WET"]}}, "REGION 1": {"CP": {"GP": ["DC", "DOL", "GH", "GO", "GP", "HS", "KAD", "MUR", "NT", "PML", "PN", "PV", "TP", "AH", "BOG", "GT", "HT", "MSK", "NE", "PU", "TLK", "UC", "WD", "WF", "HGY", "NW", "RB", "UPS", "WTM"], "KY": ["AKU", "DIN", "GG", "HKT", "KS", "KY", "MMN", "MN", "PKL", "RA", "RKL", "TTY", "WH"], "MT": ["BKM", "DB", "GHN", "GLW", "HBR", "LG", "MT", "NL", "POL", "RX", "SIG", "UK", "WIL"]}, "EP": {"PR": ["ARG", "DKY", "HN", "MAY", "PR", "PSG", "WKN"]}, "NP": {"AD": ["AD", "EPA", "GLE", "GLN", "HRP", "KBT", "KGD", "KWA", "MTE", "MWI", "NCH", "NGP", "NHD", "PDY", "PPK", "TBT", "TRP"]}, "NWP": {"CW": ["AA", "BNG", "CW", "KAP", "LW", "MC", "MX", "PX", "RD"], "KG": ["AB", "GGM", "IBG", "KG", "MG", "MQ", "NDP", "NK", "PTR", "PW", "RGM", "WP", "DMB", "GU", "HZ", "KLY", "NC", "PL"]}, "WPN": {"GQ": ["GE", "GQ", "KWL", "UDT", "VR"], "KI": ["BIA", "DG", "DX", "GIR", "HEY", "IHA", "KDW", "KI", "MAL", "MAN", "PUG", "RAM", "SIY"], "NG": ["BDL", "DH", "DJ", "KAA", "KK", "KN", "MNG", "NG", "RL", "SL"], "NTB": ["KAL", "KDY", "MI", "PC", "RAN", "VG"], "WT": ["JL", "RG", "WT"]}}, "REGION 2": {"SAB & UVA": {"BW": ["BD", "GKT", "HE", "KDT", "MM", "MYN", "NM", "PJ", "APK", "BMR", "BW", "DYT", "HPT", "KSL", "WM", "BF", "BI", "BZ", "KAG", "MRG", "SYB", "TNL", "WLW"], "KE": ["AR", "BU", "DI", "DOW", "GLG", "HMT", "KE", "KOK", "KV", "MNA", "RC", "RK", "UD", "WK", "YA"], "RN": ["AYA", "BG", "BHY", "EH", "GKW", "KEL", "KHA", "KOL", "KR", "KWN", "PE", "RN", "RW"]}, "SP": {"GL": ["DU", "GL", "HAR", "IM", "NF", "UM", "UNW"], "HB": ["ANK", "AQ", "BL", "EMB", "HB", "HGM", "MIA", "MRJ", "RMT", "SRB", "SUR", "SVG", "TBL", "TG", "TRS", "WU", "WY"], "MH": ["AK", "DN", "DW", "HM", "KDE", "KJ", "KKN", "KOP", "MH", "MUL", "MWA", "MWK", "PTB", "TJ", "UB", "WJ", "YMH"]}, "WPS": {"AG": ["AG", "BE", "BTP", "EP", "HI", "KOG"], "HR": ["BLS", "GNP", "GRG", "GVN", "HPG", "HR", "IG", "KHN", "MGH", "ML", "NB"], "KT": ["BR", "BT", "DGD", "KT", "KUN", "MGE", "MGM", "PYG"], "PH": ["BDG", "KSW", "PH", "WDW"]}}, "REGION 3": {"EP": {"AP": ["AP", "HIN", "IN", "MOY", "PDT", "PTV", "UHN"], "BC": ["BC", "EV", "KKD", "KWD", "VH"], "KL": ["AKP", "KL", "NTV", "OV", "SM", "TKV"], "TC": ["AGB", "AND", "CB", "GMK", "KCH", "KID", "KNT", "KNY", "MUP", "MUT", "NLU", "PME", "PNK", "PPS", "SW", "TA", "TC", "TPR"]}, "NP": {"JA": ["CKM", "CVA", "JA", "KPY", "MPI", "PT", "STK"], "KO": ["KO", "MLT"], "VA": ["MB", "CDK", "VA"]}}};
 
-// Dropdowns
+// Dropdowns for Add Project
 const regSelect = document.getElementById("regSelect");
 const provSelect = document.getElementById("provSelect");
 const rtomSelect = document.getElementById("rtomSelect");
 const leaSelect = document.getElementById("leaSelect");
 
-Object.keys(mappingData).forEach(reg => regSelect.add(new Option(reg, reg)));
+if (regSelect) {
+    Object.keys(mappingData).forEach(reg => regSelect.add(new Option(reg, reg)));
 
-regSelect.addEventListener("change", () => {
-    provSelect.innerHTML = '<option value="">-- Select --</option>'; rtomSelect.innerHTML = '<option value="">-- Select --</option>'; leaSelect.innerHTML = '<option value="">-- Select --</option>';
-    provSelect.disabled = !regSelect.value; rtomSelect.disabled = true; leaSelect.disabled = true;
-    if(regSelect.value) Object.keys(mappingData[regSelect.value]).forEach(prov => provSelect.add(new Option(prov, prov)));
-});
+    regSelect.addEventListener("change", () => {
+        provSelect.innerHTML = '<option value="">-- Select --</option>'; rtomSelect.innerHTML = '<option value="">-- Select --</option>'; leaSelect.innerHTML = '<option value="">-- Select --</option>';
+        provSelect.disabled = !regSelect.value; rtomSelect.disabled = true; leaSelect.disabled = true;
+        if(regSelect.value) Object.keys(mappingData[regSelect.value]).forEach(prov => provSelect.add(new Option(prov, prov)));
+    });
 
-provSelect.addEventListener("change", () => {
-    rtomSelect.innerHTML = '<option value="">-- Select --</option>'; leaSelect.innerHTML = '<option value="">-- Select --</option>';
-    rtomSelect.disabled = !provSelect.value; leaSelect.disabled = true;
-    if(provSelect.value) Object.keys(mappingData[regSelect.value][provSelect.value]).forEach(rtom => rtomSelect.add(new Option(rtom, rtom)));
-});
+    provSelect.addEventListener("change", () => {
+        rtomSelect.innerHTML = '<option value="">-- Select --</option>'; leaSelect.innerHTML = '<option value="">-- Select --</option>';
+        rtomSelect.disabled = !provSelect.value; leaSelect.disabled = true;
+        if(provSelect.value) Object.keys(mappingData[regSelect.value][provSelect.value]).forEach(rtom => rtomSelect.add(new Option(rtom, rtom)));
+    });
 
-rtomSelect.addEventListener("change", () => {
-    leaSelect.innerHTML = '<option value="">-- Select --</option>';
-    leaSelect.disabled = !rtomSelect.value;
-    if(rtomSelect.value) mappingData[regSelect.value][provSelect.value][rtomSelect.value].forEach(lea => leaSelect.add(new Option(lea, lea)));
-});
+    rtomSelect.addEventListener("change", () => {
+        leaSelect.innerHTML = '<option value="">-- Select --</option>';
+        leaSelect.disabled = !rtomSelect.value;
+        if(rtomSelect.value) mappingData[regSelect.value][provSelect.value][rtomSelect.value].forEach(lea => leaSelect.add(new Option(lea, lea)));
+    });
+}
+
+// Dropdowns for Edit Modal
+const editRegSelect = document.getElementById("editRegSelect");
+const editProvSelect = document.getElementById("editProvSelect");
+const editRtomSelect = document.getElementById("editRtomSelect");
+const editLeaSelect = document.getElementById("editLeaSelect");
+
+if (editRegSelect) {
+    Object.keys(mappingData).forEach(reg => editRegSelect.add(new Option(reg, reg)));
+
+    editRegSelect.addEventListener("change", () => {
+        editProvSelect.innerHTML = '<option value="">-- Select --</option>'; 
+        editRtomSelect.innerHTML = '<option value="">-- Select --</option>'; 
+        editLeaSelect.innerHTML = '<option value="">-- Select --</option>';
+        editProvSelect.disabled = !editRegSelect.value; 
+        editRtomSelect.disabled = true; 
+        editLeaSelect.disabled = true;
+        if(editRegSelect.value) Object.keys(mappingData[editRegSelect.value]).forEach(prov => editProvSelect.add(new Option(prov, prov)));
+    });
+
+    editProvSelect.addEventListener("change", () => {
+        editRtomSelect.innerHTML = '<option value="">-- Select --</option>'; 
+        editLeaSelect.innerHTML = '<option value="">-- Select --</option>';
+        editRtomSelect.disabled = !editProvSelect.value; 
+        editLeaSelect.disabled = true;
+        if(editProvSelect.value) Object.keys(mappingData[editRegSelect.value][editProvSelect.value]).forEach(rtom => editRtomSelect.add(new Option(rtom, rtom)));
+    });
+
+    editRtomSelect.addEventListener("change", () => {
+        editLeaSelect.innerHTML = '<option value="">-- Select --</option>';
+        editLeaSelect.disabled = !editRtomSelect.value;
+        if(editRtomSelect.value) mappingData[editRegSelect.value][editProvSelect.value][editRtomSelect.value].forEach(lea => editLeaSelect.add(new Option(lea, lea)));
+    });
+}
 
 function showSection(sectionId, btnId) {
     document.querySelectorAll('.section-content').forEach(sec => sec.classList.add('d-none'));
@@ -192,7 +228,77 @@ function updateProfileDisplay() {
     }
 }
 
-// --- View Projects ටැබ් එකේ සියලුම ප්‍රොජෙක්ට්ස් හැමෝටම පෙන්වන loadDashboardData ෆන්ක්ෂන් එක ---
+// --- View Projects Table Search Function ---
+window.renderViewProjectsTable = function() {
+    const tableBody = document.getElementById("projectsTableBody");
+    if (!tableBody) return;
+    
+    const searchTerm = document.getElementById("viewProjectsSearchInput")?.value.trim().toLowerCase() || "";
+    tableBody.innerHTML = '';
+
+    Object.entries(allProjectsData).forEach(([pid, data]) => {
+        const searchableText = [
+            data.projectName, 
+            data.poNumber, 
+            data.projectNo, 
+            data.invoiceRefNumber,
+            data.sltRefNumber, 
+            data.rtom, 
+            data.lea, 
+            data.projectType,
+            data.invoiceStatus, 
+            data.asbuiltStatus,
+            data.invDrawnBy,
+            data.asbDrawnBy
+        ].map(value => String(value || "").toLowerCase()).join(" ");
+
+        if (!searchTerm || searchableText.includes(searchTerm)) {
+            const getBadge = (status, by, startDate, compDate) => {
+                if(status === 'Print Pending') {
+                    return `<span class="badge bg-warning text-dark" style="line-height: 1.4; text-align: left;">Print Pending 🖨<br><small>Approved by admin</small></span>`;
+                }
+                if(status === 'Print Complete') {
+                    return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">Print Complete ✔<br><small>Final handoff complete</small></span>`;
+                }
+                if(status === 'Completed') {
+                    return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">
+                                Completed ✔<br>
+                                <small>
+                                    By: ${getUserDisplayName(by)}<br>
+                                    Start: ${formatDate(startDate)}<br>
+                                    End: ${formatDate(compDate)}
+                                </small>
+                            </span>`;
+                }
+                if(status === 'Preparing') {
+                    return `<span class="badge bg-info text-dark" style="line-height: 1.4; text-align: left;">
+                                Preparing ⏳<br>
+                                <small>
+                                    By: ${getUserDisplayName(by)}<br>
+                                    Start: ${formatDate(startDate)}
+                                </small>
+                            </span>`;
+                }
+                return `<span class="badge bg-warning text-dark">Pending 🕒</span>`;
+            };
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="fw-bold">${escapeHtml(data.projectName)}<br><small class="text-muted">PO: ${escapeHtml(data.poNumber || '-')}</small></td>
+                <td><small>Invoice Ref: ${escapeHtml(data.invoiceRefNumber || '-')}<br>Project No: ${escapeHtml(data.projectNo || '-')}<br>SLT/Request Ref: ${escapeHtml(data.sltRefNumber || '-')}</small></td>
+                <td>${escapeHtml(data.rtom || '-')} / ${escapeHtml(data.lea || '-')}</td>
+                <td><span class="badge bg-secondary">${escapeHtml(data.projectType || '-')}</span></td>
+                <td>${getBadge(data.invoiceStatus, data.invDrawnBy, data.invStartDate, data.invCompleteDate)}</td>
+                <td>${getBadge(data.asbuiltStatus, data.asbDrawnBy, data.asbStartDate, data.asbCompleteDate)}</td>
+                <td>${renderProjectReviewSummary(data)}</td>
+            `;
+            tableBody.appendChild(tr);
+        }
+    });
+};
+
+document.getElementById('viewProjectsSearchInput')?.addEventListener('input', renderViewProjectsTable);
+
 async function loadDashboardData() {
     const q = query(collection(db, "osp_projects"));
     const querySnapshot = await getDocs(q);
@@ -201,11 +307,8 @@ async function loadDashboardData() {
     allProjectsData = {}; 
     
     const projectSelect = document.getElementById("projectSelect");
-    const tableBody = document.getElementById("projectsTableBody");
     selectableProjects = [];
-    
     projectSelect.innerHTML = '<option value="">-- තෝරන්න --</option>';
-    tableBody.innerHTML = '';
 
     querySnapshot.forEach((docSnap) => {
         const data = docSnap.data();
@@ -215,10 +318,9 @@ async function loadDashboardData() {
         const isAssignedWork = data.invDrawnBy === currentUserEmail || data.asbDrawnBy === currentUserEmail;
         const visibleForUser = data.invoiceStatus === "Pending" || data.asbuiltStatus === "Pending" || isAssignedWork;
         const dashboardVisible = summaryMode === "all" || isAssignedWork;
-        const canEditInvoice = data.invoiceStatus === "Completed" &&
-            (isAdmin || data.invDrawnBy === currentUserEmail);
-        const canEditAsbuilt = data.asbuiltStatus === "Completed" &&
-            (isAdmin || data.asbDrawnBy === currentUserEmail);
+        const canEditInvoice = data.invoiceStatus === "Completed" && (isAdmin || data.invDrawnBy === currentUserEmail);
+        const canEditAsbuilt = data.asbuiltStatus === "Completed" && (isAdmin || data.asbDrawnBy === currentUserEmail);
+        
         if ((summaryMode === "all" || visibleForUser) &&
             (data.invoiceStatus !== "Completed" || data.asbuiltStatus !== "Completed" || canEditInvoice || canEditAsbuilt)) {
             selectableProjects.push({ pid, data });
@@ -228,50 +330,9 @@ async function loadDashboardData() {
             count++;
             totalVal += Number(data.invoiceAmount) || 0;
         }
-
-        const getBadge = (status, by, startDate, compDate) => {
-            if(status === 'Print Pending') {
-                return `<span class="badge bg-warning text-dark" style="line-height: 1.4; text-align: left;">Print Pending 🖨<br><small>Approved by admin</small></span>`;
-            }
-            if(status === 'Print Complete') {
-                return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">Print Complete ✔<br><small>Final handoff complete</small></span>`;
-            }
-            if(status === 'Completed') {
-                return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">
-                            Completed ✔<br>
-                            <small>
-                                By: ${getUserDisplayName(by)}<br>
-                                Start: ${formatDate(startDate)}<br>
-                                End: ${formatDate(compDate)}
-                            </small>
-                        </span>`;
-            }
-            if(status === 'Preparing') {
-                return `<span class="badge bg-info text-dark" style="line-height: 1.4; text-align: left;">
-                            Preparing ⏳<br>
-                            <small>
-                                By: ${getUserDisplayName(by)}<br>
-                                Start: ${formatDate(startDate)}
-                            </small>
-                        </span>`;
-            }
-            return `<span class="badge bg-warning text-dark">Pending 🕒</span>`;
-        };
-
-        // View Projects ටැබ් එකට සියලුම ප්‍රොජෙක්ට්ස් තොරතුරු (Actions තීරුව ඉවත් කර ඇත)
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td class="fw-bold">${escapeHtml(data.projectName)}<br><small class="text-muted">PO: ${escapeHtml(data.poNumber || '-')}</small></td>
-            <td><small>Invoice Ref: ${escapeHtml(data.invoiceRefNumber || '-')}<br>Project No: ${escapeHtml(data.projectNo || '-')}<br>SLT/Request Ref: ${escapeHtml(data.sltRefNumber || '-')}</small></td>
-            <td>${escapeHtml(data.rtom || '-')} / ${escapeHtml(data.lea || '-')}</td>
-            <td><span class="badge bg-secondary">${escapeHtml(data.projectType || '-')}</span></td>
-            <td>${getBadge(data.invoiceStatus, data.invDrawnBy, data.invStartDate, data.invCompleteDate)}</td>
-            <td>${getBadge(data.asbuiltStatus, data.asbDrawnBy, data.asbStartDate, data.asbCompleteDate)}</td>
-            <td>${renderProjectReviewSummary(data)}</td>
-        `;
-        tableBody.appendChild(tr);
     });
 
+    renderViewProjectsTable();
     renderProjectOptions();
 
     document.getElementById("totProjects").innerText = count;
@@ -407,9 +468,26 @@ function renderPrintJob(job) {
             ${getReviewBadge(printStatus)}
         </div>
         <div class="small text-muted mt-2">${type === "invoice" ? `Invoice value: Rs ${formatAmount(Number(data.invoiceAmount) || 0)}` : "Drawing approved by admin"}</div>
-        ${isPending ? `<div class="d-flex gap-2 mt-3"><button type="button" class="btn btn-sm btn-outline-primary" onclick="printDrawing('${pid}', '${type}')"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</button><button type="button" class="btn btn-sm btn-success" onclick="completePrint('${pid}', '${type}')"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Print Complete</button></div>` : `<div class="small text-success mt-2"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Print completed ${formatDate(data[`${type}PrintCompletedAt`])}</div>`}
+        ${isPending ? `<div class="d-flex gap-2 mt-3"><button type="button" class="btn btn-sm btn-success" onclick="completePrint('${pid}', '${type}')"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Print Complete</button></div>` : `<div class="small text-success mt-2"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Print completed ${formatDate(data[`${type}PrintCompletedAt`])}</div>`}
     </div>`;
 }
+
+window.completePrint = async function(pid, type) {
+    if (!allProjectsData[pid] || !["invoice", "asbuilt"].includes(type)) return;
+    
+    const statusField = type === "invoice" ? "invoiceStatus" : "asbuiltStatus";
+    const nowStr = new Date().toISOString();
+    try {
+        await updateDoc(doc(db, "osp_projects", pid), { [statusField]: "Print Complete", [`${type}PrintStatus`]: "Print Complete", [`${type}PrintCompletedAt`]: nowStr });
+        allProjectsData[pid][statusField] = "Print Complete";
+        allProjectsData[pid][`${type}PrintStatus`] = "Print Complete";
+        allProjectsData[pid][`${type}PrintCompletedAt`] = nowStr;
+        renderPrintQueue();
+        loadDashboardData();
+    } catch (error) {
+        alert(`Print completion failed: ${error.message}`);
+    }
+};
 
 function renderPrintQueue() {
     const invoiceJobs = getUserDrawingJobs("invoice");
@@ -899,7 +977,6 @@ document.getElementById('adminDeleteSelectedBtn').addEventListener('click', asyn
     try {
         await Promise.all(selectedIds.map(pid => deleteDoc(doc(db, "osp_projects", pid))));
         selectedAdminProjectIds.clear();
-        document.getElementById('adminEditProjectPanel').classList.add('d-none');
         await loadDashboardData();
     } catch (error) {
         alert(`Bulk delete failed: ${error.message}`);
@@ -929,15 +1006,26 @@ document.getElementById('adminRefreshReviewsBtn').addEventListener('click', asyn
     }
 });
 
+// --- Modify Project via Popup Modal with Dropdowns ---
 window.openEditProject = function(pid) {
     if (!isAdmin || !allProjectsData[pid]) return;
     const data = allProjectsData[pid];
     document.getElementById('editProjectId').value = pid;
-    document.getElementById('editRegion').value = data.region || "";
-    document.getElementById('editProvince').value = data.province || "";
-    document.getElementById('editRtom').value = data.rtom || "";
-    document.getElementById('editLea').value = data.lea || "";
-    document.getElementById('editProjectType').value = data.projectType || "";
+    
+    if (editRegSelect) {
+        editRegSelect.value = data.region || "";
+        editRegSelect.dispatchEvent(new Event('change'));
+        
+        editProvSelect.value = data.province || "";
+        editProvSelect.dispatchEvent(new Event('change'));
+        
+        editRtomSelect.value = data.rtom || "";
+        editRtomSelect.dispatchEvent(new Event('change'));
+        
+        editLeaSelect.value = data.lea || "";
+    }
+
+    document.getElementById('editProjectType').value = data.projectType || "Additional";
     document.getElementById('editProjectName').value = data.projectName || "";
     document.getElementById('editInvoiceRef').value = data.invoiceRefNumber || "";
     document.getElementById('editProjectNo').value = data.projectNo || "";
@@ -945,9 +1033,13 @@ window.openEditProject = function(pid) {
     document.getElementById('editPoNumber').value = data.poNumber || "";
     document.getElementById('editInvoiceAmount').value = data.invoiceAmount || "";
     document.getElementById('editProjectStatus').innerText = "";
-    showSection('adminProjectsSection', 'nav-admin-projects');
-    document.getElementById('adminEditProjectPanel').classList.remove('d-none');
-    document.getElementById('adminEditProjectPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const modalEl = document.getElementById('editProjectModal');
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalEl);
+    }
+    modal.show();
 };
 
 window.deleteProject = async function(pid) {
@@ -956,7 +1048,6 @@ window.deleteProject = async function(pid) {
     if (!window.confirm(`Delete project "${projectName}"? This cannot be undone.`)) return;
     try {
         await deleteDoc(doc(db, "osp_projects", pid));
-        document.getElementById('adminEditProjectPanel').classList.add('d-none');
         await loadDashboardData();
     } catch (error) {
         alert(`Delete failed: ${error.message}`);
@@ -969,16 +1060,18 @@ document.getElementById('saveEditProjectBtn').addEventListener('click', async ()
     const projectName = document.getElementById('editProjectName').value.trim();
     const invoiceAmount = Number(document.getElementById('editInvoiceAmount').value);
     const status = document.getElementById('editProjectStatus');
+    
     if (!pid || !projectName || !Number.isFinite(invoiceAmount)) {
         status.className = "small mt-2 text-danger";
         status.innerText = "Project Name සහ valid Invoice Amount අවශ්‍යයි.";
         return;
     }
+    
     const updates = {
-        region: document.getElementById('editRegion').value.trim(),
-        province: document.getElementById('editProvince').value.trim(),
-        rtom: document.getElementById('editRtom').value.trim(),
-        lea: document.getElementById('editLea').value.trim(),
+        region: editRegSelect.value.trim(),
+        province: editProvSelect.value.trim(),
+        rtom: editRtomSelect.value.trim(),
+        lea: editLeaSelect.value.trim(),
         projectType: document.getElementById('editProjectType').value.trim(),
         projectName,
         invoiceRefNumber: document.getElementById('editInvoiceRef').value.trim(),
@@ -987,20 +1080,21 @@ document.getElementById('saveEditProjectBtn').addEventListener('click', async ()
         poNumber: document.getElementById('editPoNumber').value.trim(),
         invoiceAmount
     };
+    
     try {
         await updateDoc(doc(db, "osp_projects", pid), updates);
         status.className = "small mt-2 text-success";
         status.innerText = "Project updated successfully.";
-        document.getElementById('adminEditProjectPanel').classList.add('d-none');
+        
+        const modalEl = document.getElementById('editProjectModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+
         await loadDashboardData();
     } catch (error) {
         status.className = "small mt-2 text-danger";
         status.innerText = `Update failed: ${error.message}`;
     }
-});
-
-document.getElementById('cancelEditProjectBtn').addEventListener('click', () => {
-    document.getElementById('adminEditProjectPanel').classList.add('d-none');
 });
 
 document.getElementById('projectSearchInput').addEventListener('input', renderProjectOptions);
@@ -2079,75 +2173,19 @@ function escapeXml(unsafe) {
     });
 }
 
+window.renderMapProjectOptions = function() {
+    const mapSelect = document.getElementById("mapProjectSelect");
+    const searchInput = document.getElementById("mapProjectSearchInput");
+    if(!mapSelect || !searchInput) return;
 
-// --- View Projects Table Search Function ---
-window.renderViewProjectsTable = function() {
-    const tableBody = document.getElementById("projectsTableBody");
-    if (!tableBody) return;
-    
-    const searchTerm = document.getElementById("viewProjectsSearchInput")?.value.trim().toLowerCase() || "";
-    tableBody.innerHTML = '';
+    const searchTerm = searchInput.value.trim().toLowerCase();
+    mapSelect.innerHTML = '<option value="">-- Select a Project --</option>';
 
     Object.entries(allProjectsData).forEach(([pid, data]) => {
-        const searchableText = [
-            data.projectName, 
-            data.poNumber, 
-            data.projectNo, 
-            data.invoiceRefNumber,
-            data.sltRefNumber, 
-            data.rtom, 
-            data.lea, 
-            data.projectType,
-            data.invoiceStatus, 
-            data.asbuiltStatus,
-            data.invDrawnBy,
-            data.asbDrawnBy
-        ].map(value => String(value || "").toLowerCase()).join(" ");
-
+        const searchableText = [data.projectName, data.projectNo, data.poNumber, data.invoiceRefNumber, data.sltRefNumber].map(value => String(value || "").toLowerCase()).join(" ");
         if (!searchTerm || searchableText.includes(searchTerm)) {
-            const getBadge = (status, by, startDate, compDate) => {
-                if(status === 'Print Pending') {
-                    return `<span class="badge bg-warning text-dark" style="line-height: 1.4; text-align: left;">Print Pending 🖨<br><small>Approved by admin</small></span>`;
-                }
-                if(status === 'Print Complete') {
-                    return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">Print Complete ✔<br><small>Final handoff complete</small></span>`;
-                }
-                if(status === 'Completed') {
-                    return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">
-                                Completed ✔<br>
-                                <small>
-                                    By: ${getUserDisplayName(by)}<br>
-                                    Start: ${formatDate(startDate)}<br>
-                                    End: ${formatDate(compDate)}
-                                </small>
-                            </span>`;
-                }
-                if(status === 'Preparing') {
-                    return `<span class="badge bg-info text-dark" style="line-height: 1.4; text-align: left;">
-                                Preparing ⏳<br>
-                                <small>
-                                    By: ${getUserDisplayName(by)}<br>
-                                    Start: ${formatDate(startDate)}
-                                </small>
-                            </span>`;
-                }
-                return `<span class="badge bg-warning text-dark">Pending 🕒</span>`;
-            };
-
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td class="fw-bold">${escapeHtml(data.projectName)}<br><small class="text-muted">PO: ${escapeHtml(data.poNumber || '-')}</small></td>
-                <td><small>Invoice Ref: ${escapeHtml(data.invoiceRefNumber || '-')}<br>Project No: ${escapeHtml(data.projectNo || '-')}<br>SLT/Request Ref: ${escapeHtml(data.sltRefNumber || '-')}</small></td>
-                <td>${escapeHtml(data.rtom || '-')} / ${escapeHtml(data.lea || '-')}</td>
-                <td><span class="badge bg-secondary">${escapeHtml(data.projectType || '-')}</span></td>
-                <td>${getBadge(data.invoiceStatus, data.invDrawnBy, data.invStartDate, data.invCompleteDate)}</td>
-                <td>${getBadge(data.asbuiltStatus, data.asbDrawnBy, data.asbStartDate, data.asbCompleteDate)}</td>
-                <td>${renderProjectReviewSummary(data)}</td>
-            `;
-            tableBody.appendChild(tr);
+            mapSelect.add(new Option(`[${data.projectType}] ${data.projectName}`, pid));
         }
     });
 };
-
-// Search Input එකට Event Listener එකක් එකතු කිරීම
-document.getElementById('viewProjectsSearchInput')?.addEventListener('input', renderViewProjectsTable);
+document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);

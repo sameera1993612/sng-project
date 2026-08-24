@@ -42,7 +42,6 @@
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-add" style="display: none;"><i class="bi bi-plus-square-fill sidebar-icon" aria-hidden="true"></i><span>Add Project</span></button>
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-user" style="display: none;"><i class="bi bi-person-plus-fill sidebar-icon" aria-hidden="true"></i><span>Add User</span></button>
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-profile"><i class="bi bi-person-circle sidebar-icon" aria-hidden="true"></i><span>My Profile</span></button>
-
                 <button type="button" class="nav-link mb-2 text-start text-white" id="nav-issues"><i class="bi bi-exclamation-triangle-fill sidebar-icon" aria-hidden="true"></i><span>Issue Log</span></button>
             </div>
             
@@ -58,15 +57,13 @@
                 <button id="floatingTableScrollRight" type="button" aria-label="Scroll right">&rsaquo;</button>
             </div>
 
-        <!-- 1. Home Section -->
+            <!-- 1. Home Section -->
             <div id="homeSection" class="section-content">
                 <h2 class="mb-4 fw-bold text-secondary">Dashboard Summary</h2>
                 <div class="summary-toolbar">
                     <div>
                         <p class="text-muted mb-0" id="summaryScope">Projects started or completed by you</p>
                     </div>
-                    
-                    <!-- Master Excel Report Button සහ All/My Work Buttons -->
                     <div class="d-flex gap-2 align-items-center">
                         <button id="masterReportBtn" class="btn btn-success d-none" onclick="downloadMasterReport()">
                             <i class="bi bi-file-earmark-excel me-1"></i> Genarate Report
@@ -76,7 +73,6 @@
                             <button type="button" class="btn btn-outline-primary active" id="myWorkBtn">My Work</button>
                         </div>
                     </div>
-                    
                 </div>
 
                 <div class="summary-group">
@@ -125,7 +121,7 @@
                 </div>
             </div>
 
-            <!-- 2. View Projects Section -->
+            <!-- 2. View Projects Section (with Search Box) -->
             <div id="viewSitesSection" class="section-content d-none">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
                     <div>
@@ -134,7 +130,6 @@
                         <p class="text-muted mb-0">Review the full project register and download a report when needed.</p>
                     </div>
                     
-                    <!-- උඩ දකුණු පැත්තෙන් සර්ච් කිරීමට සහ Build Report සඳහා පහසුකම -->
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <div class="input-group input-group-sm" style="width: 260px;">
                             <input type="search" id="viewProjectsSearchInput" class="form-control" placeholder="Search project, status..." autocomplete="off">
@@ -187,6 +182,7 @@
                     </div>
                 </div>
             </div>
+
             <!-- 2.3 Print Pending Section -->
             <div id="printSection" class="section-content d-none">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
@@ -286,30 +282,6 @@
                             </table>
                         </div>
                         <div id="adminProjectsEmptyState" class="text-center text-muted py-4 d-none">No projects match your search.</div>
-                        <div id="adminEditProjectPanel" class="edit-project-panel mt-4 d-none">
-                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-                                <h5 class="fw-bold text-primary mb-0">Modify Project Details</h5>
-                                <button id="cancelEditProjectBtn" type="button" class="btn btn-sm btn-outline-secondary">Close</button>
-                            </div>
-                            <input type="hidden" id="editProjectId">
-                            <div class="row g-3">
-                                <div class="col-md-6"><label class="form-label fw-bold">Region</label><input id="editRegion" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label fw-bold">Province</label><input id="editProvince" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label fw-bold">RTOM</label><input id="editRtom" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label fw-bold">LEA</label><input id="editLea" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label fw-bold">Project Type</label><input id="editProjectType" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label fw-bold">Project Name</label><input id="editProjectName" class="form-control"></div>
-                                <div class="col-md-4"><label class="form-label fw-bold">Invoice Ref Number</label><input id="editInvoiceRef" class="form-control"></div>
-                                <div class="col-md-4"><label class="form-label fw-bold">Project No</label><input id="editProjectNo" class="form-control"></div>
-                                <div class="col-md-4"><label class="form-label fw-bold">SLT/Request Ref</label><input id="editSltRef" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label fw-bold">PO Number</label><input id="editPoNumber" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label fw-bold">Invoice Amount</label><input id="editInvoiceAmount" type="number" class="form-control"></div>
-                            </div>
-                            <div class="mt-3 d-flex gap-2">
-                                <button id="saveEditProjectBtn" type="button" class="btn btn-primary">Save Changes</button>
-                            </div>
-                            <div id="editProjectStatus" class="small mt-2" role="status"></div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -472,25 +444,19 @@
                             </select>
                         </div>
                         
-                        <!-- Actions Area -->
                         <div id="actionArea" class="d-none">
                             <h5 class="fw-bold text-primary mb-3" id="selProjName">Project Name</h5>
-                            
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <div class="card border-info">
                                         <div class="card-header bg-info text-white fw-bold">Invoice Drawing Progress</div>
-                                        <div class="card-body text-center" id="invActionBody">
-                                            <!-- Buttons dynamically loaded here -->
-                                        </div>
+                                        <div class="card-body text-center" id="invActionBody"></div>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <div class="card border-secondary">
                                         <div class="card-header bg-secondary text-white fw-bold">As-Built Drawing Progress</div>
-                                        <div class="card-body text-center" id="asbActionBody">
-                                            <!-- Buttons dynamically loaded here -->
-                                        </div>
+                                        <div class="card-body text-center" id="asbActionBody"></div>
                                     </div>
                                 </div>
                             </div>
@@ -520,46 +486,41 @@
                     </div>
                 </div>
             </div>
+
             <!-- 8. Project Map Section -->
             <div id="mapSection" class="section-content d-none">
-                
-                <!-- Title Area -->
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <div>
                         <h2 class="mb-1 fw-bold text-secondary">Project Map Workspace</h2>
                         <p class="text-muted mb-0">Draw project layers, save them, and upload KMZ/KML files.</p>
                     </div>
                 </div>
-                
-                <!-- Map Toolbar -->
-                    <div class="row g-2 mb-3 align-items-end p-3 bg-white rounded-3 shadow-sm border">
-                        <div class="col-lg-5">
-                            <label class="form-label small fw-bold text-muted mb-1" for="mapProjectSearchInput">Select Project</label>
-                            <input type="search" id="mapProjectSearchInput" class="form-control form-control-sm mb-1" placeholder="Search by name, PO, Ref No..." autocomplete="off">
-                            <select id="mapProjectSelect" class="form-select border-primary form-select-sm">
-                                <option value="">-- Select a Project --</option>
+                <div class="row g-2 mb-3 align-items-end p-3 bg-white rounded-3 shadow-sm border">
+                    <div class="col-lg-5">
+                        <label class="form-label small fw-bold text-muted mb-1" for="mapProjectSearchInput">Select Project</label>
+                        <input type="search" id="mapProjectSearchInput" class="form-control form-control-sm mb-1" placeholder="Search by name, PO, Ref No..." autocomplete="off">
+                        <select id="mapProjectSelect" class="form-select border-primary form-select-sm">
+                            <option value="">-- Select a Project --</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-7 d-flex flex-wrap gap-2 align-items-end justify-content-lg-end">
+                        <div>
+                            <label class="form-label small fw-bold text-muted mb-1 d-block">Stage</label>
+                            <select id="mapStageSelect" class="form-select form-select-sm border-info" style="width: 120px;">
+                                <option value="HLD">HLD</option>
+                                <option value="LLD">LLD</option>
+                                <option value="PAT">PAT</option>
+                                <option value="FINAL">FINAL</option>
                             </select>
                         </div>
-                        <div class="col-lg-7 d-flex flex-wrap gap-2 align-items-end justify-content-lg-end">
-                            <div>
-                                <label class="form-label small fw-bold text-muted mb-1 d-block">Stage</label>
-                                <select id="mapStageSelect" class="form-select form-select-sm border-info" style="width: 120px;">
-                                    <option value="HLD">HLD</option>
-                                    <option value="LLD">LLD</option>
-                                    <option value="PAT">PAT</option>
-                                    <option value="FINAL">FINAL</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="form-label small fw-bold text-muted mb-1 d-block">Upload KMZ</label>
-                                <input type="file" id="kmzUpload" accept=".kmz,.kml" class="form-control form-control-sm" style="max-width: 190px;">
-                            </div>
-                            <button id="saveMapBtn" class="btn btn-sm btn-success fw-bold"><i class="bi bi-cloud-arrow-up-fill me-1"></i> Save Map</button>
-                            <button type="button" class="btn btn-sm btn-outline-dark fw-bold" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="bi bi-download me-1"></i> Export Data</button>
+                        <div>
+                            <label class="form-label small fw-bold text-muted mb-1 d-block">Upload KMZ</label>
+                            <input type="file" id="kmzUpload" accept=".kmz,.kml" class="form-control form-control-sm" style="max-width: 190px;">
                         </div>
+                        <button id="saveMapBtn" class="btn btn-sm btn-success fw-bold"><i class="bi bi-cloud-arrow-up-fill me-1"></i> Save Map</button>
+                        <button type="button" class="btn btn-sm btn-outline-dark fw-bold" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="bi bi-download me-1"></i> Export Data</button>
                     </div>
-
-                <!-- Map Container -->
+                </div>
                 <div class="card shadow border-0 rounded-4 mb-4">
                     <div class="card-body p-0">
                         <div id="projectMap" style="width: 100%; height: 65vh; min-height: 500px; border-radius: 1rem; z-index: 1;"></div>
@@ -569,34 +530,122 @@
             
             <!-- Export Modal -->
             <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-dark">Export Map Data</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-secondary">Export Scope</label>
-                        <select id="exportScope" class="form-select border-primary">
-                            <option value="all">Entire Project (All Folders in Stage)</option>
-                            <option value="folder">Active Folder Only</option>
-                        </select>
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title fw-bold text-dark">Export Map Data</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-secondary">Export Scope</label>
+                                <select id="exportScope" class="form-select border-primary">
+                                    <option value="all">Entire Project (All Folders in Stage)</option>
+                                    <option value="folder">Active Folder Only</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-secondary">Export Format</label>
+                                <select id="exportFormat" class="form-select border-success">
+                                    <option value="kml">KML (For Google Earth / QGIS)</option>
+                                    <option value="geojson">GeoJSON</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary w-100 fw-bold" onclick="executeExport()"><i class="bi bi-download me-2"></i> Download File</button>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-secondary">Export Format</label>
-                        <select id="exportFormat" class="form-select border-success">
-                            <option value="kml">KML (For Google Earth / QGIS)</option>
-                            <option value="geojson">GeoJSON</option>
-                        </select>
-                        <small class="text-muted d-block mt-2">* KML ෆයිල් එකක් KMZ එකක් විදිහටම Google Earth සඳහා භාවිතා කළ හැක.</small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary w-100 fw-bold" onclick="executeExport()"><i class="bi bi-download me-2"></i> Download File</button>
-                </div>
                 </div>
             </div>
+
+            <!-- Edit Project Modal (Popup Window with Dropdowns) -->
+            <div class="modal fade" id="editProjectModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-dark text-white">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Modify Project Details</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <input type="hidden" id="editProjectId">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Region:</label>
+                                    <select id="editRegSelect" class="form-select"><option value="">-- Select --</option></select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Province:</label>
+                                    <select id="editProvSelect" class="form-select" disabled><option value="">-- Select --</option></select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">RTOM:</label>
+                                    <select id="editRtomSelect" class="form-select" disabled><option value="">-- Select --</option></select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">LEA:</label>
+                                    <select id="editLeaSelect" class="form-select" disabled><option value="">-- Select --</option></select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Project Type:</label>
+                                <select id="editProjectType" class="form-select">
+                                    <option value="Additional">Additional</option>
+                                    <option value="Civil Work">Civil Work</option>
+                                    <option value="Cluster">Cluster</option>
+                                    <option value="CR">CR</option>
+                                    <option value="DIS">DIS</option>
+                                    <option value="Fault clearance">Fault clearance</option>
+                                    <option value="FSSD">FSSD</option>
+                                    <option value="FTTB">FTTB</option>
+                                    <option value="HRB">HRB</option>
+                                    <option value="MH-CA">MH-CA</option>
+                                    <option value="MKT">MKT</option>
+                                    <option value="MSAN">MSAN</option>
+                                    <option value="OF">OF</option>
+                                    <option value="OF-FTTH">OF-FTTH</option>
+                                    <option value="Pole Shifting">Pole Shifting</option>
+                                    <option value="PON">PON</option>
+                                    <option value="RDA Related">RDA Related</option>
+                                    <option value="Rehabilitation">Rehabilitation</option>
+                                    <option value="SHIFTING">SHIFTING</option>
+                                    <option value="SSD">SSD</option>
+                                    <option value="SWF">SWF</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Project Name:</label>
+                                <input type="text" id="editProjectName" class="form-control" placeholder="Project Name / Description">
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">PO Number:</label>
+                                    <input type="text" id="editPoNumber" class="form-control" placeholder="e.g. 24506984">
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label fw-bold">Invoice Amount (Without TAX):</label>
+                                    <input type="number" id="editInvoiceAmount" class="form-control" placeholder="e.g. 167471">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Invoice Ref Number:</label>
+                                    <input type="text" id="editInvoiceRef" class="form-control" placeholder="Invoice reference">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Project No:</label>
+                                    <input type="text" id="editProjectNo" class="form-control" placeholder="Project number">
+                                </div>
+                                <div class="col-md-4 mb-4">
+                                    <label class="form-label fw-bold">SLT Ref/Request Ref Number:</label>
+                                    <input type="text" id="editSltRef" class="form-control" placeholder="SLT or request reference">
+                                </div>
+                            </div>
+                            <div id="editProjectStatus" class="small mt-2 mb-3" role="status"></div>
+                            <button id="saveEditProjectBtn" type="button" class="btn btn-success w-100 fw-bold">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- 5. Issue Log Section -->
