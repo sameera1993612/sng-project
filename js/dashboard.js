@@ -142,6 +142,17 @@ document.getElementById('nav-issues').addEventListener('click', () => {
     showSection('issuesSection', 'nav-issues');
     renderIssues();
 });
+document.getElementById('nav-map').addEventListener('click', () => {
+    showSection('mapSection', 'nav-map');
+    initMap(); 
+    
+    // මැප් එක පේජ් එකට ආවට පස්සේ හරියටම ෆිට් වෙන්න පොඩි වෙලාවක් දෙනවා
+    setTimeout(() => {
+        if (projectMap) {
+            projectMap.invalidateSize();
+        }
+    }, 300);
+});
 
 const formatDate = (dateStr) => {
     if(!dateStr) return "-";
@@ -281,7 +292,9 @@ async function loadDashboardData() {
     renderAdminReviews();
     renderPrintQueue();
     renderIssues();
+    renderMapProjectOptions(); // Map options function called here
     requestAnimationFrame(setupFloatingTableScrollbar);
+    
 }
 
 function renderAdminProjects() {
@@ -819,6 +832,32 @@ function downloadProjectReport() {
     status.className = 'small mt-2 text-success';
     status.innerText = `${rows.length} project${rows.length === 1 ? '' : 's'} exported successfully.`;
 }
+
+// --- Map Project ලිස්ට් එකට Search එකක් එක්ක ඩේටා දැමීම (Fixed Scope) ---
+function renderMapProjectOptions() {
+    const mapSelect = document.getElementById("mapProjectSelect");
+    const searchInput = document.getElementById("mapProjectSearchInput");
+    if(!mapSelect || !searchInput) return;
+
+    const searchTerm = searchInput.value.trim().toLowerCase();
+    mapSelect.innerHTML = '<option value="">-- Select a Project --</option>';
+
+    Object.entries(allProjectsData).forEach(([pid, data]) => {
+        const searchableText = [
+            data.projectName,
+            data.projectNo,
+            data.poNumber,
+            data.invoiceRefNumber,
+            data.sltRefNumber
+        ].map(value => String(value || "").toLowerCase()).join(" ");
+
+        if (!searchTerm || searchableText.includes(searchTerm)) {
+            mapSelect.add(new Option(`[${data.projectType}] ${data.projectName}`, pid));
+        }
+    });
+}
+
+document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -1414,3 +1453,677 @@ window.updateTask = async function(pid, type, newStatus) {
 };
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => window.location.href = "login.html"));
+
+// --- Map Save, Load, Layers & Export Functions ---
+
+let projectMap = null;
+let drawnItems = null;
+let drawControl = null;
+let layerControl = null;
+let customTreeControl = null;
+let referenceLayers = {};
+let currentMapProject = "";
+let currentMapStage = "HLD"; 
+let kmzParser = null;
+let currentStageLayers = []; 
+
+let userCreatedFolders = new Set(["Cable", "FDP", "FTC", "MH", "Pole", "Road", "Joint"]);
+let openFolders = new Set(["Cable", "FDP", "FTC", "MH", "Pole", "Road", "Joint"]);
+let baseMapsMap = {};
+
+// Custom Point Icon (පාට වෙනස් කරන්න පුළුවන් ලස්සන Dot එකක්)
+function createCustomIcon(color) {
+    return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color:${color}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
+        iconSize: [16,16], iconAnchor: [8,8]
+    });
+}
+
+// GeoJSON ලෝඩ් කරද්දී පාට සහ ඩිසයින් හැදීම
+const geojsonStyleOptions = {
+    style: function(feature) {
+        return {
+            color: feature.properties.color || '#3388ff',
+            weight: feature.properties.weight || 3,
+            opacity: 0.8
+        };
+    },
+    pointToLayer: function(feature, latlng) {
+        let c = feature.properties.color || '#e11d48';
+        return L.marker(latlng, { icon: createCustomIcon(c) });
+    }
+};
+
+window.initMap = function() {
+    if (projectMap !== null) {
+        setTimeout(() => projectMap.invalidateSize(), 200);
+        return;
+    }
+    
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 });
+    const googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+    const googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+    const googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+
+    projectMap = L.map('projectMap', { center: [7.8731, 80.7718], zoom: 7, layers: [googleHybrid] }); 
+
+    drawnItems = new L.FeatureGroup();
+    projectMap.addLayer(drawnItems);
+
+    baseMapsMap = {
+        "Google Hybrid (Sat + Roads)": googleHybrid,
+        "Google Satellite": googleSat,
+        "Google Streets": googleStreets,
+        "OpenStreetMap": osm
+    };
+    
+    layerControl = L.control.layers(baseMapsMap, {}, { collapsed: true, position: 'topleft' }).addTo(projectMap);
+
+    // අලුත් "Folders & Items" Control එක
+    customTreeControl = L.control({position: 'topright'});
+    customTreeControl.onAdd = function (map) {
+        let div = L.DomUtil.create('div', 'leaflet-control bg-white shadow-sm p-2 rounded border');
+        div.style.width = '300px'; div.style.maxHeight = '70vh'; div.style.overflowY = 'auto';
+        L.DomEvent.disableClickPropagation(div); L.DomEvent.disableScrollPropagation(div);
+        
+        div.innerHTML = `
+            <div class="mb-2 border-bottom pb-2">
+                <label class="small fw-bold text-success mb-1">✏️ Active Folder (Draw here):</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" id="activeDrawFolder" class="form-control border-success fw-bold text-success" value="Cable" list="folderList" placeholder="Folder Name">
+                    <button class="btn btn-success" type="button" onclick="createNewFolder()" title="Create Folder"><i class="bi bi-folder-plus"></i></button>
+                </div>
+                <datalist id="folderList">
+                    <option value="Cable"><option value="FDP"><option value="FTC"><option value="MH"><option value="Pole"><option value="Road"><option value="Joint">
+                </datalist>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-1 border-bottom pb-1">
+                <h6 class="fw-bold mb-0 text-secondary" style="font-size: 13px;"><i class="bi bi-layers"></i> Project Layers</h6>
+                <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="updateTreeControl()"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+            <div id="treeContainer" class="small mt-2"></div>
+        `;
+        return div;
+    };
+    customTreeControl.addTo(projectMap);
+
+    drawControl = new L.Control.Draw({
+        edit: { featureGroup: drawnItems, remove: false },
+        draw: { polygon: true, polyline: true, rectangle: false, circle: false, marker: true, circlemarker: false }
+    });
+    projectMap.addControl(drawControl);
+
+    // අලුතින් අඳින දෙයක් Active Folder එකට දානවා, සහ Auto-Popup වෙනවා
+    projectMap.on(L.Draw.Event.CREATED, function (event) {
+        const layer = event.layer;
+        if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
+        
+        let targetFolder = document.getElementById('activeDrawFolder').value.trim() || "Other";
+        userCreatedFolders.add(targetFolder); openFolders.add(targetFolder);
+
+        layer.feature.properties.folder = targetFolder;
+        layer.feature.properties.name = ""; // හිස්ව තියනවා Type කරන්න
+        layer.feature.properties.color = (layer instanceof L.Marker) ? '#e11d48' : '#3388ff';
+        layer.feature.properties.weight = 3;
+
+        // Custom Icon එක සෙට් කිරීම
+        if (layer instanceof L.Marker) {
+            layer.setIcon(createCustomIcon(layer.feature.properties.color));
+        }
+
+        bindFeaturePopup(layer, layer.feature, false, currentMapStage); 
+        drawnItems.addLayer(layer);
+        currentStageLayers.push(layer);
+        updateTreeControl();
+        
+        // Auto-Open Popup & Focus
+        layer.openPopup();
+    });
+};
+
+// --- Folder Rename & Delete ---
+window.renameFolder = function(e, oldName) {
+    e.stopPropagation(); e.preventDefault();
+    let newName = prompt(`Rename folder '${oldName}' to:`, oldName);
+    if(newName && newName.trim() !== "" && newName !== oldName) {
+        newName = newName.trim();
+        currentStageLayers.forEach(l => {
+            if(l.feature.properties.folder === oldName) l.feature.properties.folder = newName;
+        });
+        userCreatedFolders.delete(oldName); userCreatedFolders.add(newName);
+        openFolders.delete(oldName); openFolders.add(newName);
+        if(document.getElementById('activeDrawFolder').value === oldName) document.getElementById('activeDrawFolder').value = newName;
+        updateTreeControl();
+    }
+};
+
+window.deleteFolder = function(e, folderName) {
+    e.stopPropagation(); e.preventDefault();
+    if(confirm(`අවවාදයි! '${folderName}' ෆෝල්ඩරය සහ එහි ඇති සියලුම දත්ත මකා දැමීමට අවශ්‍යද?`)) {
+        let layersToRemove = currentStageLayers.filter(l => l.feature.properties.folder === folderName);
+        layersToRemove.forEach(l => drawnItems.removeLayer(l));
+        currentStageLayers = currentStageLayers.filter(l => l.feature.properties.folder !== folderName);
+        userCreatedFolders.delete(folderName); openFolders.delete(folderName);
+        if(document.getElementById('activeDrawFolder').value === folderName) document.getElementById('activeDrawFolder').value = "Cable";
+        updateTreeControl();
+    }
+};
+
+// --- Folders Create & Drag ---
+window.createNewFolder = function() {
+    let input = document.getElementById('activeDrawFolder');
+    let fName = input.value.trim();
+    if(fName) { userCreatedFolders.add(fName); openFolders.add(fName); updateTreeControl(); }
+};
+window.setActiveFolder = function(e, folderName) {
+    e.stopPropagation(); document.getElementById('activeDrawFolder').value = folderName; updateTreeControl();
+};
+window.toggleFolderState = function(folderName, isOpen) {
+    if(isOpen) openFolders.add(folderName); else openFolders.delete(folderName);
+};
+window.handleDragStart = function(e, id) { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; };
+window.allowDrop = function(e) { e.preventDefault(); };
+window.handleDropFeature = function(e, targetFolder) {
+    e.preventDefault(); e.currentTarget.classList.remove('border-primary'); 
+    let id = e.dataTransfer.getData("text/plain");
+    if(id) {
+        let layer = currentStageLayers.find(l => L.stamp(l) == id);
+        if(layer) {
+            layer.feature.properties.folder = targetFolder;
+            userCreatedFolders.add(targetFolder); openFolders.add(targetFolder);
+            updateTreeControl();
+        }
+    }
+};
+
+// --- Tree Control එක Update කිරීම ---
+window.updateTreeControl = function() {
+    let treeContainer = document.getElementById('treeContainer');
+    if(!treeContainer) return;
+    
+    let groups = {};
+    userCreatedFolders.forEach(f => groups[f] = []); 
+    
+    currentStageLayers.forEach(layer => {
+        let cat = layer.feature?.properties?.folder || "Other";
+        userCreatedFolders.add(cat); 
+        if(!groups[cat]) groups[cat] = [];
+        groups[cat].push(layer);
+    });
+
+    let activeFolder = document.getElementById('activeDrawFolder')?.value.trim() || "Cable";
+    let html = '';
+
+    for(let cat in groups) {
+        let isAllChecked = groups[cat].length > 0 && groups[cat].every(l => drawnItems.hasLayer(l));
+        let isSomeChecked = groups[cat].length > 0 && groups[cat].some(l => drawnItems.hasLayer(l));
+        let checkboxState = isAllChecked ? 'checked' : '';
+        let indeterminate = (!isAllChecked && isSomeChecked) ? 'data-indeterminate="true"' : '';
+        let isActive = (cat === activeFolder);
+
+        html += `
+        <details ${openFolders.has(cat) ? 'open' : ''} ontoggle="toggleFolderState('${cat}', this.open)" class="mb-2 rounded border p-1 shadow-sm ${isActive ? 'bg-success-subtle border-success' : 'bg-light border-light'}" 
+            ondragover="allowDrop(event); this.classList.add('border-primary');" ondragleave="this.classList.remove('border-primary');" ondrop="this.classList.remove('border-primary'); handleDropFeature(event, '${cat}')">
+            
+            <summary class="fw-bold ${isActive ? 'text-success' : 'text-dark'}" style="cursor: pointer; user-select: none; list-style: none;">
+                <div class="d-inline-flex align-items-center w-100">
+                    <input type="checkbox" class="folder-toggle me-2 form-check-input mt-0" data-folder="${cat}" ${checkboxState} ${indeterminate}> 
+                    <span onclick="setActiveFolder(event, '${cat}')" class="d-flex align-items-center flex-grow-1" title="Set as active">
+                        <i class="bi ${groups[cat].length ? 'bi-folder2-open' : 'bi-folder'} ${isActive ? 'text-success' : 'text-warning'} me-1"></i> 
+                        <span class="text-truncate" style="max-width:90px;">${cat}</span> 
+                    </span>
+                    <span class="ms-auto me-2">
+                        <i class="bi bi-pencil-square text-primary ms-1" title="Rename" onclick="renameFolder(event, '${cat}')"></i>
+                        <i class="bi bi-trash text-danger ms-1" title="Delete" onclick="deleteFolder(event, '${cat}')"></i>
+                    </span>
+                    <span class="badge ${isActive ? 'bg-success' : 'bg-secondary'}">${groups[cat].length}</span>
+                </div>
+            </summary>
+            <div class="ms-4 mt-1 border-start ps-2 border-2 ${isActive ? 'border-success' : ''}">
+        `;
+        groups[cat].forEach(layer => {
+            let name = layer.feature?.properties?.name || "Unnamed Item";
+            let lid = L.stamp(layer);
+            let isChecked = drawnItems.hasLayer(layer) ? 'checked' : '';
+            html += `
+                <div id="tree-item-${lid}" class="d-flex align-items-center mb-1 feature-item p-1 rounded" draggable="true" ondragstart="handleDragStart(event, ${lid})" style="cursor: grab;">
+                    <input type="checkbox" class="item-toggle me-2 form-check-input mt-0" data-id="${lid}" ${isChecked}>
+                    <i class="bi bi-grip-vertical text-muted me-1 small"></i>
+                    <span class="text-truncate small text-secondary fw-semibold hover-primary flex-grow-1" style="cursor: pointer;" onclick="zoomToLayer(${lid})">${name}</span>
+                </div>
+            `;
+        });
+        html += `</div></details>`;
+    }
+    treeContainer.innerHTML = html;
+
+    treeContainer.querySelectorAll('.folder-toggle[data-indeterminate="true"]').forEach(chk => chk.indeterminate = true);
+    treeContainer.querySelectorAll('.folder-toggle').forEach(chk => {
+        chk.addEventListener('change', function() {
+            let checked = this.checked;
+            groups[this.dataset.folder].forEach(layer => {
+                if(checked) { if(!drawnItems.hasLayer(layer)) drawnItems.addLayer(layer); } 
+                else { if(drawnItems.hasLayer(layer)) drawnItems.removeLayer(layer); }
+            });
+            updateTreeControl();
+        });
+    });
+    treeContainer.querySelectorAll('.item-toggle').forEach(chk => {
+        chk.addEventListener('change', function() {
+            let layer = currentStageLayers.find(l => L.stamp(l) == parseInt(this.dataset.id));
+            if(layer) {
+                if(this.checked) { if(!drawnItems.hasLayer(layer)) drawnItems.addLayer(layer); } 
+                else { if(drawnItems.hasLayer(layer)) drawnItems.removeLayer(layer); }
+            }
+            updateTreeControl();
+        });
+    });
+};
+
+window.zoomToLayer = function(id) {
+    let layer = currentStageLayers.find(l => L.stamp(l) === id);
+    if(layer) {
+        if(!drawnItems.hasLayer(layer)) { drawnItems.addLayer(layer); updateTreeControl(); }
+        if(layer.getBounds) projectMap.fitBounds(layer.getBounds());
+        else if(layer.getLatLng) projectMap.setView(layer.getLatLng(), 19);
+        layer.openPopup();
+    }
+};
+
+// --- Popup Settings (Auto-select in Tree, Styling & Length Calculation) ---
+function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Active") {
+    let props = (feature && feature.properties) ? feature.properties : {};
+    let name = props.name || props.Name || "";
+    let desc = props.desc || props.description || props.Description || "";
+    let folder = props.folder || "Other";
+    let color = props.color || (layer instanceof L.Marker ? '#e11d48' : '#3388ff');
+    let weight = props.weight || 3;
+
+    // Line එකක් නම් ඒකේ දුර මීටර් වලින් ගණනය කිරීම
+    let lengthHtml = "";
+    if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+        let latlngs = layer.getLatLngs();
+        let length = 0;
+        for(let i=0; i<latlngs.length-1; i++) length += latlngs[i].distanceTo(latlngs[i+1]);
+        props.length_m = length.toFixed(2) + " m";
+        lengthHtml = `<span class="badge bg-dark ms-2">Length: ${props.length_m}</span>`;
+    }
+
+    let coordsHtml = "";
+    if (layer.getLatLng) { 
+        let ll = layer.getLatLng();
+        coordsHtml = `<div class="mb-2 small text-danger fw-bold"><i class="bi bi-geo-alt-fill"></i> (${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)})</div>`;
+    }
+
+    let extraProps = "";
+    const ignoreList = ['name','Name','desc','description','Description','folder','color','weight','length_m','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
+    for(let k in props) {
+        if(!ignoreList.includes(k) && !k.startsWith('_')) {
+            extraProps += `<tr><th class="small p-1 text-muted" style="width:40%;">${k}</th><td class="small p-1 fw-semibold text-break">${props[k]}</td></tr>`;
+        }
+    }
+    if(extraProps) extraProps = `<div class="mt-2 mb-2" style="max-height:100px; overflow-y:auto;"><table class="table table-sm table-bordered mb-0">${extraProps}</table></div>`;
+
+    let popupContent = document.createElement('div');
+    popupContent.style.minWidth = "250px";
+
+    if (isReadOnly) {
+        popupContent.innerHTML = `
+            <h6 class="fw-bold mb-1 text-primary border-bottom pb-1">👁 ${stageName} Layer</h6>
+            ${name ? `<div class="fw-bold text-dark mb-1">${name} ${lengthHtml}</div>` : ''}
+            ${coordsHtml}
+            ${desc ? `<div class="small mt-1 text-wrap text-break p-1 bg-light rounded">${desc}</div>` : ''}
+            ${extraProps}
+        `;
+        layer.bindPopup(popupContent);
+    } else {
+        popupContent.innerHTML = `
+            <h6 class="fw-bold mb-2 text-success border-bottom pb-1">✏️ Edit Feature ${lengthHtml}</h6>
+            ${coordsHtml}
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <label class="small fw-bold text-muted">Folder:</label>
+                    <input type="text" class="form-control form-control-sm feature-folder border-info fw-bold" value="${folder}">
+                </div>
+                <div class="col-6">
+                    <label class="small fw-bold text-muted">Item Name:</label>
+                    <input type="text" class="form-control form-control-sm feature-name border-success fw-bold" value="${name}" placeholder="Name...">
+                </div>
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <label class="small fw-bold text-muted">Color:</label>
+                    <input type="color" class="form-control form-control-sm form-control-color w-100 feature-color" value="${color}">
+                </div>
+                <div class="col-6">
+                    <label class="small fw-bold text-muted">Size / Thikness:</label>
+                    <input type="number" class="form-control form-control-sm feature-weight" value="${weight}" min="1" max="15">
+                </div>
+            </div>
+            ${desc ? `<div class="small mb-2 p-1 bg-light rounded">${desc}</div>` : ''}
+            ${extraProps}
+            <div class="d-flex gap-2 mt-2 pt-2 border-top">
+                <button class="btn btn-sm btn-primary flex-grow-1 save-feature-btn"><i class="bi bi-check2-circle me-1"></i>Save</button>
+                <button class="btn btn-sm btn-danger delete-feature-btn" title="Delete Feature"><i class="bi bi-trash3-fill"></i></button>
+            </div>
+        `;
+        layer.bindPopup(popupContent);
+
+        // Popup එක Open වෙද්දී
+        layer.on('popupopen', function() {
+            // Auto Focus to Name
+            setTimeout(() => { popupContent.querySelector('.feature-name').focus(); }, 100);
+
+            // දකුණු පැත්තේ Tree එකෙන් Auto Select වීම
+            let lid = L.stamp(layer);
+            let treeItem = document.getElementById('tree-item-' + lid);
+            if(treeItem) {
+                let details = treeItem.closest('details');
+                if(details) details.open = true;
+                document.querySelectorAll('.feature-item').forEach(el => el.classList.remove('bg-warning-subtle'));
+                treeItem.classList.add('bg-warning-subtle');
+                treeItem.scrollIntoView({behavior: "smooth", block: "center"});
+            }
+
+            // Save Button
+            popupContent.querySelector('.save-feature-btn').onclick = function() {
+                let newName = popupContent.querySelector('.feature-name').value;
+                let newFolder = popupContent.querySelector('.feature-folder').value || "Other";
+                let newColor = popupContent.querySelector('.feature-color').value;
+                let newWeight = parseInt(popupContent.querySelector('.feature-weight').value) || 3;
+                
+                if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
+                layer.feature.properties.name = newName;
+                layer.feature.properties.folder = newFolder;
+                layer.feature.properties.color = newColor;
+                layer.feature.properties.weight = newWeight;
+                
+                // Style Apply කිරීම
+                if(layer.setStyle) layer.setStyle({color: newColor, weight: newWeight});
+                if(layer instanceof L.Marker) layer.setIcon(createCustomIcon(newColor));
+                
+                userCreatedFolders.add(newFolder); openFolders.add(newFolder);
+                
+                layer.closePopup();
+                if (newName) {
+                    layer.bindTooltip(newName, {permanent: true, direction: "auto", className: "fw-bold text-dark bg-white shadow-sm"}).openTooltip();
+                } else { layer.unbindTooltip(); }
+                updateTreeControl();
+            };
+
+            // Delete Button
+            popupContent.querySelector('.delete-feature-btn').onclick = function() {
+                if(confirm("මෙම කොටස මැප් එකෙන් සම්පූර්ණයෙන්ම මකා දැමීමට අවශ්‍යද?")) {
+                    drawnItems.removeLayer(layer);
+                    currentStageLayers = currentStageLayers.filter(l => l !== layer);
+                    updateTreeControl();
+                }
+            };
+        });
+    }
+
+    if (name) {
+        layer.bindTooltip(name, {permanent: true, direction: "auto", className: "fw-bold text-dark bg-white shadow-sm"});
+    }
+}
+
+// Project / Stage මාරු කිරීම
+document.getElementById('mapProjectSelect').addEventListener('change', (e) => {
+    currentMapProject = e.target.value; loadMapDataForProjectAndStage();
+});
+document.getElementById('mapStageSelect').addEventListener('change', (e) => {
+    currentMapStage = e.target.value; loadMapDataForProjectAndStage();
+});
+
+function loadMapDataForProjectAndStage() {
+    drawnItems.clearLayers(); currentStageLayers = [];
+    
+    Object.keys(referenceLayers).forEach(stage => {
+        if(referenceLayers[stage]) {
+            layerControl.removeLayer(referenceLayers[stage]); projectMap.removeLayer(referenceLayers[stage]);
+        }
+    });
+    referenceLayers = {};
+
+    if (!currentMapProject) { updateTreeControl(); return; }
+
+    const data = allProjectsData[currentMapProject];
+    if (data && data.mapStages) {
+        // 1. Active Stage Load කිරීම
+        if (data.mapStages[currentMapStage]) {
+            try {
+                const stageData = data.mapStages[currentMapStage];
+                const geojsonData = typeof stageData === 'string' ? JSON.parse(stageData) : stageData;
+                
+                L.geoJSON(geojsonData, {
+                    ...geojsonStyleOptions,
+                    onEachFeature: function(feature, layer) {
+                        if(!layer.feature) layer.feature = feature;
+                        let fName = feature.properties.folder || "Other";
+                        userCreatedFolders.add(fName); 
+                        bindFeaturePopup(layer, layer.feature, false, currentMapStage);
+                        drawnItems.addLayer(layer); currentStageLayers.push(layer);
+                    }
+                });
+                if (drawnItems.getLayers().length > 0) projectMap.fitBounds(drawnItems.getBounds());
+            } catch (e) { console.error(e); }
+        }
+
+        // 2. Reference Stages Load කිරීම
+        const colors = { "HLD": "#3388ff", "LLD": "#9c27b0", "PAT": "#ff9800", "FINAL": "#4caf50" };
+        Object.keys(data.mapStages).forEach(stage => {
+            if (stage !== currentMapStage) {
+                try {
+                    const refData = data.mapStages[stage];
+                    const geojsonData = typeof refData === 'string' ? JSON.parse(refData) : refData;
+                    
+                    let refLayerGroup = L.geoJSON(geojsonData, {
+                        style: { color: colors[stage] || '#555', dashArray: '5, 5', weight: 2, opacity: 0.8 },
+                        pointToLayer: function(feature, latlng) { return L.marker(latlng, {icon: createCustomIcon(colors[stage])}); },
+                        onEachFeature: function(feature, layer) { bindFeaturePopup(layer, feature, true, stage); }
+                    });
+                    referenceLayers[stage] = refLayerGroup;
+                    layerControl.addOverlay(refLayerGroup, `<b style="color:${colors[stage]||'#555'}">👁 ${stage} (Ref)</b>`);
+                } catch (e) { console.error(e); }
+            }
+        });
+    }
+    updateTreeControl();
+}
+
+document.getElementById('saveMapBtn').addEventListener('click', async () => {
+    if (!currentMapProject) { alert("කරුණාකර මුලින්ම Project එකක් තෝරන්න!"); return; }
+    
+    let allFeatures = { type: "FeatureCollection", features: [] };
+    currentStageLayers.forEach(l => { if(l.toGeoJSON) allFeatures.features.push(l.toGeoJSON()); });
+    const geojsonString = JSON.stringify(allFeatures);
+    
+    try {
+        const updatePath = `mapStages.${currentMapStage}`;
+        await updateDoc(doc(db, "osp_projects", currentMapProject), { [updatePath]: geojsonString });
+        if(!allProjectsData[currentMapProject].mapStages) allProjectsData[currentMapProject].mapStages = {};
+        allProjectsData[currentMapProject].mapStages[currentMapStage] = geojsonString;
+        alert(`${currentMapStage} Map data එක සාර්ථකව Save වුණා!`);
+    } catch (error) { alert("Error saving map: " + error.message); }
+});
+
+document.getElementById('kmzUpload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    const fileUrl = URL.createObjectURL(file);
+
+    if (!kmzParser) {
+        kmzParser = L.kmzLayer();
+        kmzParser.on('load', function(event) {
+            event.layer.eachLayer(function(l) {
+                if(!l.feature) l.feature = { type: "Feature", properties: {} };
+                let folderName = l.feature.properties.folder || document.getElementById('activeDrawFolder').value.trim() || "Uploaded";
+                l.feature.properties.folder = folderName;
+                l.feature.properties.color = (l instanceof L.Marker) ? '#e11d48' : '#3388ff';
+                l.feature.properties.weight = 3;
+
+                if (l instanceof L.Marker) l.setIcon(createCustomIcon('#e11d48'));
+                else if (l.setStyle) l.setStyle({color: '#3388ff', weight: 3});
+
+                userCreatedFolders.add(folderName); openFolders.add(folderName);
+                bindFeaturePopup(l, l.feature, false, currentMapStage);
+                drawnItems.addLayer(l); currentStageLayers.push(l);
+            });
+            if (drawnItems.getLayers().length > 0) projectMap.fitBounds(drawnItems.getBounds());
+            updateTreeControl();
+        });
+    }
+    kmzParser.load(fileUrl);
+    e.target.value = ''; 
+});
+
+// --- Map Export Functions (KML & GeoJSON, All vs Folder) ---
+// --- Map Export Functions (KML & GeoJSON, All vs Folder) ---
+
+window.executeExport = function() {
+    if (currentStageLayers.length === 0) { 
+        alert("Export කරන්න Data නැහැ."); 
+        return; 
+    }
+
+    let scope = document.getElementById('exportScope').value;
+    let format = document.getElementById('exportFormat').value;
+    let activeFolder = document.getElementById('activeDrawFolder').value.trim();
+
+    let featuresToExport = [];
+    currentStageLayers.forEach(l => {
+        if(l.toGeoJSON) {
+            let geojson = l.toGeoJSON();
+            let layerFolder = geojson.properties.folder || "Other";
+            
+            // Scope එක All නම් ඔක්කොම ගන්නවා, Folder නම් Active එක විතරක් ගන්නවා
+            if(scope === 'all' || layerFolder === activeFolder) {
+                featuresToExport.push(geojson);
+            }
+        }
+    });
+
+    if (featuresToExport.length === 0) { 
+        alert("තෝරාගත් කොටසේ Export කිරීමට Data නොමැත."); 
+        return; 
+    }
+
+    let featureCollection = { type: "FeatureCollection", features: featuresToExport };
+    let dataStr, fileExt;
+
+    if(format === 'geojson') {
+        dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(featureCollection));
+        fileExt = ".geojson";
+    } else {
+        // GeoJSON එක KML බවට පත් කිරීම
+        let kmlString = geoJsonToKML(featureCollection);
+        dataStr = "data:application/vnd.google-earth.kml+xml;charset=utf-8," + encodeURIComponent(kmlString);
+        fileExt = ".kml";
+    }
+
+    const projectName = currentMapProject ? allProjectsData[currentMapProject].projectName.replace(/\s+/g, '_') : "Project";
+    let suffix = scope === 'all' ? "All_Folders" : activeFolder;
+    let defaultFileName = `${projectName}_${currentMapStage}_${suffix}${fileExt}`;
+    
+    // ෆයිල් එකේ නම වෙනස් කරන්න දෙන Prompt එක
+    let finalFileName = prompt("ඩවුන්ලෝඩ් වන ෆයිල් එකේ නම ලබා දෙන්න:", defaultFileName);
+    
+    if (!finalFileName) return; // Cancel කළොත් නවතිනවා
+    if (!finalFileName.endsWith(fileExt)) finalFileName += fileExt;
+
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", finalFileName);
+    
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+
+    // Modal එක වසා දැමීම
+    let exportModal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+    if(exportModal) exportModal.hide();
+};
+
+// GeoJSON => KML Converter (අමතර Attributes සහ GPS සමඟ)
+function geoJsonToKML(geoJson) {
+    let kml = '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n';
+    
+    geoJson.features.forEach((feature, i) => {
+        let props = feature.properties || {};
+        let name = props.name || props.Name || "Feature " + (i+1);
+        let desc = props.desc || props.description || "";
+        
+        // පාට සකස් කිරීම (HTML HEX -> KML aabbggrr)
+        let htmlColor = props.color || "#3388ff";
+        if(htmlColor.startsWith('#')) htmlColor = htmlColor.substring(1);
+        let kmlColor = "ff" + htmlColor.substring(4,6) + htmlColor.substring(2,4) + htmlColor.substring(0,2);
+        let weight = props.weight || 3;
+
+        kml += `<Placemark>\n<name>${escapeXml(name)}</name>\n`;
+        if(desc) kml += `<description>${escapeXml(desc)}</description>\n`;
+        
+        kml += `<Style><LineStyle><color>${kmlColor}</color><width>${weight}</width></LineStyle><IconStyle><color>${kmlColor}</color></IconStyle></Style>\n`;
+
+        // Attribute / Data ටික Table එකක් විදිහට සේව් වීම (ExtendedData)
+        kml += `<ExtendedData>\n`;
+        let geom = feature.geometry;
+        
+        // Point එකක් නම් GPS එක වෙනම Attribute එකක් විදිහට දානවා
+        if(geom.type === 'Point') {
+            kml += `<Data name="GPS Coordinates"><value>${geom.coordinates[1].toFixed(6)}, ${geom.coordinates[0].toFixed(6)}</value></Data>\n`;
+        }
+        
+        // අනිත් ඔක්කොම Attributes ටික KML එකට දානවා
+        const ignoreList = ['name','Name','desc','description','Description','color','weight','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
+        for(let k in props) {
+            if(!ignoreList.includes(k) && !k.startsWith('_')) {
+                kml += `<Data name="${escapeXml(k)}"><value>${escapeXml(String(props[k]))}</value></Data>\n`;
+            }
+        }
+        kml += `</ExtendedData>\n`;
+
+        // Geometry එක අඳින විදිහ
+        if(geom.type === 'Point') {
+            kml += `<Point><coordinates>${geom.coordinates[0]},${geom.coordinates[1]}</coordinates></Point>\n`;
+        } else if(geom.type === 'LineString') {
+            let coords = geom.coordinates.map(c => `${c[0]},${c[1]}`).join(' ');
+            kml += `<LineString><coordinates>${coords}</coordinates></LineString>\n`;
+        } else if(geom.type === 'Polygon') {
+            let coords = geom.coordinates[0].map(c => `${c[0]},${c[1]}`).join(' ');
+            kml += `<Polygon><outerBoundaryIs><LinearRing><coordinates>${coords}</coordinates></LinearRing></outerBoundaryIs></Polygon>\n`;
+        }
+        kml += `</Placemark>\n`;
+    });
+    
+    kml += '</Document>\n</kml>';
+    return kml;
+}
+
+function escapeXml(unsafe) {
+    return (unsafe||"").replace(/[<>&'"]/g, function (c) {
+        switch (c) { case '<': return '&lt;'; case '>': return '&gt;'; case '&': return '&amp;'; case '\'': return '&apos;'; case '"': return '&quot;'; }
+    });
+}
+
+
+
+
+
+
+window.renderMapProjectOptions = function() {
+    const mapSelect = document.getElementById("mapProjectSelect");
+    const searchInput = document.getElementById("mapProjectSearchInput");
+    if(!mapSelect || !searchInput) return;
+
+    const searchTerm = searchInput.value.trim().toLowerCase();
+    mapSelect.innerHTML = '<option value="">-- Select a Project --</option>';
+
+    Object.entries(allProjectsData).forEach(([pid, data]) => {
+        const searchableText = [data.projectName, data.projectNo, data.poNumber, data.invoiceRefNumber, data.sltRefNumber].map(value => String(value || "").toLowerCase()).join(" ");
+        if (!searchTerm || searchableText.includes(searchTerm)) {
+            mapSelect.add(new Option(`[${data.projectType}] ${data.projectName}`, pid));
+        }
+    });
+};
+document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
