@@ -145,8 +145,6 @@ document.getElementById('nav-issues').addEventListener('click', () => {
 document.getElementById('nav-map').addEventListener('click', () => {
     showSection('mapSection', 'nav-map');
     initMap(); 
-    
-    // මැප් එක පේජ් එකට ආවට පස්සේ හරියටම ෆිට් වෙන්න පොඩි වෙලාවක් දෙනවා
     setTimeout(() => {
         if (projectMap) {
             projectMap.invalidateSize();
@@ -194,6 +192,7 @@ function updateProfileDisplay() {
     }
 }
 
+// --- View Projects ටැබ් එකේ සියලුම ප්‍රොජෙක්ට්ස් හැමෝටම පෙන්වන loadDashboardData ෆන්ක්ෂන් එක ---
 async function loadDashboardData() {
     const q = query(collection(db, "osp_projects"));
     const querySnapshot = await getDocs(q);
@@ -230,7 +229,6 @@ async function loadDashboardData() {
             totalVal += Number(data.invoiceAmount) || 0;
         }
 
-        // අලුතින් වෙනස් කළ කොටස (Start සහ End දිනයන් දෙකම පෙන්වීම)
         const getBadge = (status, by, startDate, compDate) => {
             if(status === 'Print Pending') {
                 return `<span class="badge bg-warning text-dark" style="line-height: 1.4; text-align: left;">Print Pending 🖨<br><small>Approved by admin</small></span>`;
@@ -260,25 +258,18 @@ async function loadDashboardData() {
             return `<span class="badge bg-warning text-dark">Pending 🕒</span>`;
         };
 
-        if (dashboardVisible) {
-            const tr = document.createElement("tr");
+        // View Projects ටැබ් එකට සියලුම ප්‍රොජෙක්ට්ස් තොරතුරු (Actions තීරුව ඉවත් කර ඇත)
+        const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td class="fw-bold">${data.projectName}<br><small class="text-muted">PO: ${data.poNumber}</small></td>
-            <td><small>Invoice Ref: ${data.invoiceRefNumber || '-'}<br>Project No: ${data.projectNo || '-'}<br>SLT/Request Ref: ${data.sltRefNumber || '-'}</small></td>
-            <td>${data.rtom} / ${data.lea}</td>
-            <td><span class="badge bg-secondary">${data.projectType}</span></td>
+            <td class="fw-bold">${escapeHtml(data.projectName)}<br><small class="text-muted">PO: ${escapeHtml(data.poNumber || '-')}</small></td>
+            <td><small>Invoice Ref: ${escapeHtml(data.invoiceRefNumber || '-')}<br>Project No: ${escapeHtml(data.projectNo || '-')}<br>SLT/Request Ref: ${escapeHtml(data.sltRefNumber || '-')}</small></td>
+            <td>${escapeHtml(data.rtom || '-')} / ${escapeHtml(data.lea || '-')}</td>
+            <td><span class="badge bg-secondary">${escapeHtml(data.projectType || '-')}</span></td>
             <td>${getBadge(data.invoiceStatus, data.invDrawnBy, data.invStartDate, data.invCompleteDate)}</td>
             <td>${getBadge(data.asbuiltStatus, data.asbDrawnBy, data.asbStartDate, data.asbCompleteDate)}</td>
             <td>${renderProjectReviewSummary(data)}</td>
         `;
-        if (isAdmin) {
-            tr.innerHTML += `<td class="admin-project-action text-nowrap" style="display: table-cell;">
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditProject('${pid}')">Edit</button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteProject('${pid}')">Delete</button>
-            </td>`;
-        }
         tableBody.appendChild(tr);
-        }
     });
 
     renderProjectOptions();
@@ -292,9 +283,8 @@ async function loadDashboardData() {
     renderAdminReviews();
     renderPrintQueue();
     renderIssues();
-    renderMapProjectOptions(); // Map options function called here
+    renderMapProjectOptions(); 
     requestAnimationFrame(setupFloatingTableScrollbar);
-    
 }
 
 function renderAdminProjects() {
@@ -680,13 +670,13 @@ function renderIssues() {
             const row = document.createElement("tr");
             const canResolve = !issue.resolved && (isAdmin || issue.addedBy === currentUserEmail);
             row.innerHTML = `
-                <td class="fw-bold">${data.projectName}<br><small class="text-muted">${data.projectNo || pid}</small></td>
+                <td class="fw-bold">${escapeHtml(data.projectName)}<br><small class="text-muted">${escapeHtml(data.projectNo || pid)}</small></td>
                 <td>${issue.type === "asbuilt" ? "As-Built Drawing" : "Invoice Drawing"}</td>
-                <td>${issue.text}</td>
-                <td>${getUserDisplayName(issue.addedBy)}</td>
+                <td>${escapeHtml(issue.text)}</td>
+                <td>${escapeHtml(getUserDisplayName(issue.addedBy))}</td>
                 <td>${formatIssueDate(issue.createdAt)}</td>
                 <td>${issue.resolved
-                    ? `<span class="badge bg-success">Resolved ✔</span><small class="text-muted d-block">${getUserDisplayName(issue.resolvedBy)}<br>${formatIssueDate(issue.resolvedAt)}</small>`
+                    ? `<span class="badge bg-success">Resolved ✔</span><small class="text-muted d-block">${escapeHtml(getUserDisplayName(issue.resolvedBy))}<br>${formatIssueDate(issue.resolvedAt)}</small>`
                     : `${canResolve ? `<button class="btn btn-sm btn-outline-success" onclick="resolveIssue('${pid}', '${issue.createdAt}')">✔ Mark as Resolved</button>` : `<span class="badge bg-warning text-dark">Open</span>`}`}</td>`;
             tableBody.appendChild(row);
         });
@@ -709,10 +699,10 @@ function renderSelectedProjectIssues(pid) {
     }
     container.innerHTML = visibleIssues.map(issue => `
         <div class="issue-item">
-            <strong>${issue.type === "asbuilt" ? "As-Built" : "Invoice"}</strong>: ${issue.text}
-            <small class="text-muted d-block">${getUserDisplayName(issue.addedBy)} | ${formatIssueDate(issue.createdAt)}</small>
+            <strong>${issue.type === "asbuilt" ? "As-Built" : "Invoice"}</strong>: ${escapeHtml(issue.text)}
+            <small class="text-muted d-block">${escapeHtml(getUserDisplayName(issue.addedBy))} | ${formatIssueDate(issue.createdAt)}</small>
             ${issue.resolved
-                ? `<span class="badge bg-success mt-1">Resolved ✔</span><small class="text-muted d-block">${getUserDisplayName(issue.resolvedBy)} | ${formatIssueDate(issue.resolvedAt)}</small>`
+                ? `<span class="badge bg-success mt-1">Resolved ✔</span><small class="text-muted d-block">${escapeHtml(getUserDisplayName(issue.resolvedBy))} | ${formatIssueDate(issue.resolvedAt)}</small>`
                 : `<button class="btn btn-sm btn-outline-success mt-2" onclick="resolveIssue('${pid}', '${issue.createdAt}')">✔ Hari / Resolved</button>`}
         </div>`).join("");
 }
@@ -774,67 +764,8 @@ function formatAmount(amount) {
     return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const reportColumns = [
-    { key: 'projectName', label: 'Project Name', value: data => data.projectName || '' },
-    { key: 'projectNo', label: 'Project No', value: data => data.projectNo || '' },
-    { key: 'poNumber', label: 'PO Number', value: data => data.poNumber || '' },
-    { key: 'invoiceRefNumber', label: 'Invoice Ref', value: data => data.invoiceRefNumber || '' },
-    { key: 'sltRefNumber', label: 'SLT/Request Ref', value: data => data.sltRefNumber || '' },
-    { key: 'location', label: 'RTOM / LEA', value: data => `${data.rtom || ''} / ${data.lea || ''}` },
-    { key: 'projectType', label: 'Project Type', value: data => data.projectType || '' },
-    { key: 'invoiceStatus', label: 'Invoice Status', value: data => data.invoiceStatus || 'Pending' },
-    { key: 'asbuiltStatus', label: 'As-Built Status', value: data => data.asbuiltStatus || 'Pending' },
-    { key: 'invoiceAmount', label: 'Invoice Amount (Rs)', value: data => Number(data.invoiceAmount) || 0 },
-    { key: 'invoiceDrawnBy', label: 'Invoice Drawn By', value: data => data.invDrawnBy || '' },
-    { key: 'asbuiltDrawnBy', label: 'As-Built Drawn By', value: data => data.asbDrawnBy || '' }
-];
-
-function initProjectReportColumns() {
-    const container = document.getElementById('projectReportColumns');
-    if (!container || container.children.length) return;
-    container.innerHTML = reportColumns.map((column, index) => `<div class="form-check"><input class="form-check-input project-report-column" type="checkbox" value="${column.key}" id="report-column-${column.key}" ${index < 9 ? 'checked' : ''}><label class="form-check-label" for="report-column-${column.key}">${column.label}</label></div>`).join('');
-}
-
-function getProjectReportRows() {
-    const searchTerm = document.getElementById('projectReportSearch').value.trim().toLowerCase();
-    const invoiceFilter = document.getElementById('projectReportInvoiceStatus').value;
-    const asbuiltFilter = document.getElementById('projectReportAsbuiltStatus').value;
-    return Object.values(allProjectsData).filter(data => {
-        const searchableText = [data.projectName, data.projectNo, data.poNumber, data.invoiceRefNumber, data.sltRefNumber, data.rtom, data.lea].map(value => String(value || '').toLowerCase()).join(' ');
-        return (!searchTerm || searchableText.includes(searchTerm)) &&
-            (invoiceFilter === 'all' || (data.invoiceStatus || 'Pending') === invoiceFilter) &&
-            (asbuiltFilter === 'all' || (data.asbuiltStatus || 'Pending') === asbuiltFilter);
-    });
-}
-
-function updateProjectReportCount() {
-    const count = getProjectReportRows().length;
-    document.getElementById('projectReportCount').innerText = `${count} project${count === 1 ? '' : 's'}`;
-}
-
-function downloadProjectReport() {
-    if (!isAdmin) return;
-    const selectedKeys = [...document.querySelectorAll('.project-report-column:checked')].map(input => input.value);
-    const columns = reportColumns.filter(column => selectedKeys.includes(column.key));
-    const status = document.getElementById('projectReportStatus');
-    if (!columns.length) {
-        status.className = 'small mt-2 text-danger';
-        status.innerText = 'Select at least one report column.';
-        return;
-    }
-    const rows = getProjectReportRows().map(data => Object.fromEntries(columns.map(column => [column.label, column.value(data)])));
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Project Report');
-    const format = document.getElementById('projectReportFormat').value;
-    const filename = `SNG_Project_Report_${new Date().toISOString().slice(0, 10)}.${format}`;
-    XLSX.writeFile(workbook, filename, { bookType: format });
-    status.className = 'small mt-2 text-success';
-    status.innerText = `${rows.length} project${rows.length === 1 ? '' : 's'} exported successfully.`;
-}
-
-// --- Map Project ලිස්ට් එකට Search එකක් එක්ක ඩේටා දැමීම (Fixed Scope) ---
-function renderMapProjectOptions() {
+// --- Map Project ලිස්ට් එකට Search එකක් එක්ක ඩේටා දැමීම ---
+window.renderMapProjectOptions = function() {
     const mapSelect = document.getElementById("mapProjectSelect");
     const searchInput = document.getElementById("mapProjectSearchInput");
     if(!mapSelect || !searchInput) return;
@@ -855,7 +786,7 @@ function renderMapProjectOptions() {
             mapSelect.add(new Option(`[${data.projectType}] ${data.projectName}`, pid));
         }
     });
-}
+};
 
 document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
 
@@ -889,11 +820,11 @@ onAuthStateChanged(auth, async (user) => {
         updateProfileDisplay();
         if (isAdmin) {
             document.body.classList.add('admin-view');
-            document.getElementById('projectActionsHeader').style.display = 'table-cell';
             document.getElementById("nav-admin-projects").style.display = "flex";
             document.getElementById("nav-admin-reviews").style.display = "flex";
             document.getElementById("nav-add").style.display = "flex";
             document.getElementById("nav-user").style.display = "flex";
+            document.getElementById("masterReportBtn")?.classList.remove("d-none");
         }
 
         if (!isAdmin) {
@@ -1344,44 +1275,104 @@ document.getElementById('projectSelect').addEventListener('change', (e) => {
     const data = allProjectsData[pid];
     document.getElementById('selProjName').innerText = `[${data.projectType}] ${data.projectName}`;
 
+    const getAdminOverrideHtml = (type, currentDrawnBy) => {
+        if (!isAdmin) return; 
+        let userOptions = `<option value="">-- Select User --</option>`;
+        Object.values(userProfiles).forEach(u => {
+            let isSelected = (u.email === currentDrawnBy) ? "selected" : "";
+            userOptions += `<option value="${escapeHtml(u.email)}" ${isSelected}>${escapeHtml(u.fullName || u.email)}</option>`;
+        });
+        return `
+            <div class="mt-4 p-3 border border-danger rounded bg-danger-subtle text-start">
+                <h6 class="text-danger fw-bold small mb-2"><i class="bi bi-shield-lock-fill"></i> Admin Manual Close</h6>
+                <label class="small fw-bold mb-1 text-dark">Assign to User:</label>
+                <select id="${type}AdminUser_${pid}" class="form-select form-select-sm mb-2 border-danger shadow-none">${userOptions}</select>
+                <label class="small fw-bold mb-1 text-dark">Completion Date & Time:</label>
+                <input type="datetime-local" id="${type}AdminDate_${pid}" class="form-control form-control-sm mb-3 border-danger shadow-none">
+                <button class="btn btn-sm btn-danger w-100 fw-bold" onclick="forceCompleteTask('${pid}', '${type}')"><i class="bi bi-exclamation-triangle-fill me-1"></i> Force Complete</button>
+            </div>
+        `;
+    };
+
     const invBody = document.getElementById('invActionBody');
+    let invHtml = "";
     if(data.invoiceStatus === 'Pending') {
-        invBody.innerHTML = `<p>දැනට මෙය Pending තත්ත්වයේ පවතී.</p>
-                             <button class="btn btn-primary" onclick="updateTask('${pid}', 'invoice', 'Preparing')">▶ Start Invoice Drawing</button>`;
+        invHtml = `<p>දැනට මෙය Pending තත්ත්වයේ පවතී.</p><button class="btn btn-primary" onclick="updateTask('${pid}', 'invoice', 'Preparing')">▶ Start Invoice Drawing</button>`;
     } else if (data.invoiceStatus === 'Preparing') {
-        invBody.innerHTML = `<p class="text-info fw-bold">Started by: ${getUserDisplayName(data.invDrawnBy)}</p>
-                             <button class="btn btn-success" onclick="updateTask('${pid}', 'invoice', 'Completed')">✔ Mark as Completed</button>`;
+        invHtml = `<p class="text-info fw-bold">Started by: ${getUserDisplayName(data.invDrawnBy)}</p><button class="btn btn-success" onclick="updateTask('${pid}', 'invoice', 'Completed')">✔ Mark as Completed</button>`;
     } else if (data.invoiceStatus === 'Print Pending') {
-        invBody.innerHTML = `<h5 class="text-warning fw-bold">Print Pending 🖨</h5><p class="small text-muted">Admin approved this drawing. Use the Print Pending tab to print and complete it.</p>`;
+        invHtml = `<h5 class="text-warning fw-bold">Print Pending 🖨</h5>`;
     } else if (data.invoiceStatus === 'Print Complete') {
-        invBody.innerHTML = `<h5 class="text-success fw-bold">Print Complete ✔</h5><p class="small text-muted">Final handoff completed.</p>`;
+        invHtml = `<h5 class="text-success fw-bold">Print Complete ✔</h5>`;
     } else {
-        invBody.innerHTML = `<h5 class="text-success fw-bold">Completed ✔</h5>`;
+        invHtml = `<h5 class="text-success fw-bold">Completed ✔</h5>`;
         if (isAdmin || data.invDrawnBy === currentUserEmail) {
-            invBody.innerHTML += `<button class="btn btn-outline-primary btn-sm" onclick="updateTask('${pid}', 'invoice', 'Preparing')">✏️ Edit Again</button>`;
+            invHtml += `<button class="btn btn-outline-primary btn-sm mt-2" onclick="updateTask('${pid}', 'invoice', 'Preparing')">✏️ Edit Again</button>`;
         }
     }
+    invBody.innerHTML = invHtml + (isAdmin ? getAdminOverrideHtml('inv', data.invDrawnBy) : '');
 
     const asbBody = document.getElementById('asbActionBody');
+    let asbHtml = "";
     if(data.asbuiltStatus === 'Pending') {
-        asbBody.innerHTML = `<p>දැනට මෙය Pending තත්ත්වයේ පවතී.</p>
-                             <button class="btn btn-primary" onclick="updateTask('${pid}', 'asbuilt', 'Preparing')">▶ Start As-Built Drawing</button>`;
+        asbHtml = `<p>දැනට මෙය Pending තත්ත්වයේ පවතී.</p><button class="btn btn-primary" onclick="updateTask('${pid}', 'asbuilt', 'Preparing')">▶ Start As-Built Drawing</button>`;
     } else if (data.asbuiltStatus === 'Preparing') {
-        asbBody.innerHTML = `<p class="text-info fw-bold">Started by: ${getUserDisplayName(data.asbDrawnBy)}</p>
-                             <button class="btn btn-success" onclick="updateTask('${pid}', 'asbuilt', 'Completed')">✔ Mark as Completed</button>`;
+        asbHtml = `<p class="text-info fw-bold">Started by: ${getUserDisplayName(data.asbDrawnBy)}</p><button class="btn btn-success" onclick="updateTask('${pid}', 'asbuilt', 'Completed')">✔ Mark as Completed</button>`;
     } else if (data.asbuiltStatus === 'Print Pending') {
-        asbBody.innerHTML = `<h5 class="text-warning fw-bold">Print Pending 🖨</h5><p class="small text-muted">Admin approved this drawing. Use the Print Pending tab to print and complete it.</p>`;
+        asbHtml = `<h5 class="text-warning fw-bold">Print Pending 🖨</h5>`;
     } else if (data.asbuiltStatus === 'Print Complete') {
-        asbBody.innerHTML = `<h5 class="text-success fw-bold">Print Complete ✔</h5><p class="small text-muted">Final handoff completed.</p>`;
+        asbHtml = `<h5 class="text-success fw-bold">Print Complete ✔</h5>`;
     } else {
-        asbBody.innerHTML = `<h5 class="text-success fw-bold">Completed ✔</h5>`;
+        asbHtml = `<h5 class="text-success fw-bold">Completed ✔</h5>`;
         if (isAdmin || data.asbDrawnBy === currentUserEmail) {
-            asbBody.innerHTML += `<button class="btn btn-outline-primary btn-sm" onclick="updateTask('${pid}', 'asbuilt', 'Preparing')">✏️ Edit Again</button>`;
+            asbHtml += `<button class="btn btn-outline-primary btn-sm mt-2" onclick="updateTask('${pid}', 'asbuilt', 'Preparing')">✏️ Edit Again</button>`;
         }
     }
+    asbBody.innerHTML = asbHtml + (isAdmin ? getAdminOverrideHtml('asb', data.asbDrawnBy) : '');
+
     renderSelectedProjectIssues(pid);
     renderSelectedProjectReview(pid);
 });
+
+window.forceCompleteTask = async function(pid, type) {
+    if (!isAdmin) return;
+    const prefix = type === 'invoice' ? 'inv' : 'asb';
+    const userSelect = document.getElementById(`${prefix}AdminUser_${pid}`).value;
+    const dateInput = document.getElementById(`${prefix}AdminDate_${pid}`).value;
+
+    if (!userSelect || !dateInput) {
+        alert("කරුණාකර User සහ Date/Time දෙකම තෝරන්න.");
+        return;
+    }
+
+    const compDate = new Date(dateInput).toISOString();
+    const projectRef = doc(db, "osp_projects", pid);
+    let updateData = {};
+
+    if (type === 'invoice') {
+        updateData.invoiceStatus = 'Completed';
+        updateData.invDrawnBy = userSelect;
+        updateData.invCompleteDate = compDate;
+        updateData.invoiceReviewStatus = "Pending Review";
+        updateData.invoiceReviewComment = "";
+    } else {
+        updateData.asbuiltStatus = 'Completed';
+        updateData.asbDrawnBy = userSelect;
+        updateData.asbCompleteDate = compDate;
+        updateData.asbuiltReviewStatus = "Pending Review";
+        updateData.asbuiltReviewComment = "";
+    }
+
+    try {
+        await updateDoc(projectRef, updateData);
+        alert("Admin Override සාර්ථකයි! Project එක Manual Complete කර ඇත.");
+        document.getElementById('projectSelect').value = "";
+        document.getElementById('actionArea').classList.add('d-none');
+        loadDashboardData();
+    } catch (e) { 
+        alert("Error: " + e.message); 
+    }
+};
 
 document.getElementById('addIssueBtn').addEventListener('click', async () => {
     if (isViewer()) { alert("Viewer accounts are read-only."); return; }
@@ -1409,7 +1400,6 @@ document.getElementById('addIssueBtn').addEventListener('click', async () => {
     }
 });
 
-// Update Task Function
 window.updateTask = async function(pid, type, newStatus) {
     if (isViewer()) {
         alert("Viewer accounts are read-only.");
@@ -1454,7 +1444,57 @@ window.updateTask = async function(pid, type, newStatus) {
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => window.location.href = "login.html"));
 
-    // --- Map Save, Load, Layers & Export Functions ---
+window.downloadMasterReport = function() {
+    if (!isAdmin) {
+        alert("මෙම පහසුකම Admin සඳහා පමණි.");
+        return;
+    }
+    if(Object.keys(allProjectsData).length === 0) {
+        alert("Export කිරීමට කිසිදු ව්‍යාපෘතියක් නොමැත.");
+        return;
+    }
+    const rows = Object.values(allProjectsData).map(data => ({
+        "Region": data.region || "-",
+        "Province": data.province || "-",
+        "RTOM": data.rtom || "-",
+        "LEA": data.lea || "-",
+        "Project Type": data.projectType || "-",
+        "Project Name": data.projectName || "-",
+        "Project No": data.projectNo || "-",
+        "PO Number": data.poNumber || "-",
+        "Invoice Ref Number": data.invoiceRefNumber || "-",
+        "SLT/Request Ref": data.sltRefNumber || "-",
+        "Invoice Amount (Rs)": Number(data.invoiceAmount) || 0,
+        "Project Added By": data.addedBy || "-",
+        "INV Status": data.invoiceStatus || "Pending",
+        "INV Drawn By": data.invDrawnBy || "-",
+        "INV Start Date": data.invStartDate ? new Date(data.invStartDate).toLocaleString() : "-",
+        "INV Complete Date": data.invCompleteDate ? new Date(data.invCompleteDate).toLocaleString() : "-",
+        "INV Review Status": data.invoiceReviewStatus || "-",
+        "INV Review By": data.invoiceReviewBy || "-",
+        "INV Reviewed At": data.invoiceReviewedAt ? new Date(data.invoiceReviewedAt).toLocaleString() : "-",
+        "INV Review Comment": data.invoiceReviewComment || "-",
+        "INV Print Status": data.invoicePrintStatus || "-",
+        "INV Print Completed At": data.invoicePrintCompletedAt ? new Date(data.invoicePrintCompletedAt).toLocaleString() : "-",
+        "ASB Status": data.asbuiltStatus || "Pending",
+        "ASB Drawn By": data.asbDrawnBy || "-",
+        "ASB Start Date": data.asbStartDate ? new Date(data.asbStartDate).toLocaleString() : "-",
+        "ASB Complete Date": data.asbCompleteDate ? new Date(data.asbCompleteDate).toLocaleString() : "-",
+        "ASB Review Status": data.asbuiltReviewStatus || "-",
+        "ASB Review By": data.asbuiltReviewBy || "-",
+        "ASB Reviewed At": data.asbuiltReviewedAt ? new Date(data.asbuiltReviewedAt).toLocaleString() : "-",
+        "ASB Review Comment": data.asbuiltReviewComment || "-",
+        "ASB Print Status": data.asbuiltPrintStatus || "-",
+        "ASB Print Completed At": data.asbuiltPrintCompletedAt ? new Date(data.asbuiltPrintCompletedAt).toLocaleString() : "-",
+        "Total Issues Added": (data.issues || []).length,
+        "Unresolved (Pending) Issues": (data.issues || []).filter(i => !i.resolved).length
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Master Project Report');
+    const filename = `SNG_Master_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+};
 
 let projectMap = null;
 let drawnItems = null;
@@ -1471,10 +1511,8 @@ let userCreatedFolders = new Set(["Cable", "FDP", "FTC", "MH", "Pole", "Road", "
 let openFolders = new Set(["Cable", "FDP", "FTC", "MH", "Pole", "Road", "Joint"]);
 let baseMapsMap = {};
 
-// Custom Point Icon (Center කර ඇත)
 function createCustomIcon(color, style = 'circle') {
     let innerHtml = '';
-    
     if (style === 'square') {
         innerHtml = `<div style="background-color:${color}; width:16px; height:16px; border:2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`;
     } else if (style === 'pin') {
@@ -1484,25 +1522,13 @@ function createCustomIcon(color, style = 'circle') {
     } else {
         innerHtml = `<div style="background-color:${color}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`;
     }
-
-    // අයිකන් එක හරියටම Center වෙන්න හැදුවා
     let htmlContent = `<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%;">${innerHtml}</div>`;
-
-    return L.divIcon({
-        className: 'custom-div-icon',
-        html: htmlContent,
-        iconSize: [26, 26], 
-        iconAnchor: [13, 13]
-    });
+    return L.divIcon({ className: 'custom-div-icon', html: htmlContent, iconSize: [26, 26], iconAnchor: [13, 13] });
 }
 
 const geojsonStyleOptions = {
     style: function(feature) {
-        return {
-            color: feature.properties.color || '#3388ff',
-            weight: feature.properties.weight || 3,
-            opacity: 0.8
-        };
+        return { color: feature.properties.color || '#3388ff', weight: feature.properties.weight || 3, opacity: 0.8 };
     },
     pointToLayer: function(feature, latlng) {
         let c = feature.properties.color || '#e11d48';
@@ -1516,30 +1542,12 @@ window.initMap = function() {
         setTimeout(() => projectMap.invalidateSize(), 200);
         return;
     }
-    
-    // අලුත්: Line වල සුදු කොටු රවුම් කිරීම සහ රෝස කොටුව Center කිරීම
     if (!document.getElementById('custom-edit-style')) {
         const style = document.createElement('style');
         style.id = 'custom-edit-style';
         style.innerHTML = `
-            /* Line Edit Points (සුදු කොටු -> පොඩි රවුම්) */
-            .leaflet-editing-icon {
-                border-radius: 50% !important;
-                width: 10px !important;
-                height: 10px !important;
-                margin-left: -5px !important;
-                margin-top: -5px !important;
-                background-color: #ffffff !important;
-                border: 2px solid #3388ff !important;
-                box-shadow: 0 0 3px rgba(0,0,0,0.4);
-            }
-            /* Marker Edit Box (රෝස කොටුව) රවුම් කිරීම */
-            .leaflet-edit-marker-selected {
-                background: rgba(254, 87, 161, 0.1) !important;
-                border: 2px dashed rgba(254, 87, 161, 0.6) !important;
-                border-radius: 50% !important;
-                margin: -2px !important; 
-            }
+            .leaflet-editing-icon { border-radius: 50% !important; width: 10px !important; height: 10px !important; margin-left: -5px !important; margin-top: -5px !important; background-color: #ffffff !important; border: 2px solid #3388ff !important; box-shadow: 0 0 3px rgba(0,0,0,0.4); }
+            .leaflet-edit-marker-selected { background: rgba(254, 87, 161, 0.1) !important; border: 2px dashed rgba(254, 87, 161, 0.6) !important; border-radius: 50% !important; margin: -2px !important; }
         `;
         document.head.appendChild(style);
     }
@@ -1550,17 +1558,10 @@ window.initMap = function() {
     const googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
 
     projectMap = L.map('projectMap', { center: [7.8731, 80.7718], zoom: 7, layers: [googleHybrid] }); 
-
     drawnItems = new L.FeatureGroup();
     projectMap.addLayer(drawnItems);
 
-    baseMapsMap = {
-        "Google Hybrid (Sat + Roads)": googleHybrid,
-        "Google Satellite": googleSat,
-        "Google Streets": googleStreets,
-        "OpenStreetMap": osm
-    };
-    
+    baseMapsMap = { "Google Hybrid (Sat + Roads)": googleHybrid, "Google Satellite": googleSat, "Google Streets": googleStreets, "OpenStreetMap": osm };
     layerControl = L.control.layers(baseMapsMap, {}, { collapsed: true, position: 'topleft' }).addTo(projectMap);
 
     customTreeControl = L.control({position: 'topright'});
@@ -1568,7 +1569,6 @@ window.initMap = function() {
         let div = L.DomUtil.create('div', 'leaflet-control bg-white shadow-sm p-2 rounded border');
         div.style.width = '300px'; div.style.maxHeight = '70vh'; div.style.overflowY = 'auto';
         L.DomEvent.disableClickPropagation(div); L.DomEvent.disableScrollPropagation(div);
-        
         div.innerHTML = `
             <div class="mb-2 border-bottom pb-2">
                 <label class="small fw-bold text-success mb-1">✏️ Active Folder (Draw here):</label>
@@ -1599,25 +1599,20 @@ window.initMap = function() {
     projectMap.on(L.Draw.Event.CREATED, function (event) {
         const layer = event.layer;
         if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
-        
         let targetFolder = document.getElementById('activeDrawFolder').value.trim() || "Other";
         userCreatedFolders.add(targetFolder); openFolders.add(targetFolder);
-
         layer.feature.properties.folder = targetFolder;
         layer.feature.properties.name = ""; 
         layer.feature.properties.color = (layer instanceof L.Marker) ? '#e11d48' : '#3388ff';
         layer.feature.properties.weight = 3;
         layer.feature.properties.iconStyle = 'circle';
-
         if (layer instanceof L.Marker) {
             layer.setIcon(createCustomIcon(layer.feature.properties.color, layer.feature.properties.iconStyle));
         }
-
         bindFeaturePopup(layer, layer.feature, false, currentMapStage); 
         drawnItems.addLayer(layer);
         currentStageLayers.push(layer);
         updateTreeControl();
-        
         layer.openPopup();
     });
 };
@@ -1627,9 +1622,7 @@ window.renameFolder = function(e, oldName) {
     let newName = prompt(`Rename folder '${oldName}' to:`, oldName);
     if(newName && newName.trim() !== "" && newName !== oldName) {
         newName = newName.trim();
-        currentStageLayers.forEach(l => {
-            if(l.feature.properties.folder === oldName) l.feature.properties.folder = newName;
-        });
+        currentStageLayers.forEach(l => { if(l.feature.properties.folder === oldName) l.feature.properties.folder = newName; });
         userCreatedFolders.delete(oldName); userCreatedFolders.add(newName);
         openFolders.delete(oldName); openFolders.add(newName);
         if(document.getElementById('activeDrawFolder').value === oldName) document.getElementById('activeDrawFolder').value = newName;
@@ -1654,12 +1647,8 @@ window.createNewFolder = function() {
     let fName = input.value.trim();
     if(fName) { userCreatedFolders.add(fName); openFolders.add(fName); updateTreeControl(); }
 };
-window.setActiveFolder = function(e, folderName) {
-    e.stopPropagation(); document.getElementById('activeDrawFolder').value = folderName; updateTreeControl();
-};
-window.toggleFolderState = function(folderName, isOpen) {
-    if(isOpen) openFolders.add(folderName); else openFolders.delete(folderName);
-};
+window.setActiveFolder = function(e, folderName) { e.stopPropagation(); document.getElementById('activeDrawFolder').value = folderName; updateTreeControl(); };
+window.toggleFolderState = function(folderName, isOpen) { if(isOpen) openFolders.add(folderName); else openFolders.delete(folderName); };
 window.handleDragStart = function(e, id) { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; };
 window.allowDrop = function(e) { e.preventDefault(); };
 window.handleDropFeature = function(e, targetFolder) {
@@ -1667,42 +1656,32 @@ window.handleDropFeature = function(e, targetFolder) {
     let id = e.dataTransfer.getData("text/plain");
     if(id) {
         let layer = currentStageLayers.find(l => L.stamp(l) == id);
-        if(layer) {
-            layer.feature.properties.folder = targetFolder;
-            userCreatedFolders.add(targetFolder); openFolders.add(targetFolder);
-            updateTreeControl();
-        }
+        if(layer) { layer.feature.properties.folder = targetFolder; userCreatedFolders.add(targetFolder); openFolders.add(targetFolder); updateTreeControl(); }
     }
 };
 
 window.updateTreeControl = function() {
     let treeContainer = document.getElementById('treeContainer');
     if(!treeContainer) return;
-    
     let groups = {};
     userCreatedFolders.forEach(f => groups[f] = []); 
-    
     currentStageLayers.forEach(layer => {
         let cat = layer.feature?.properties?.folder || "Other";
         userCreatedFolders.add(cat); 
         if(!groups[cat]) groups[cat] = [];
         groups[cat].push(layer);
     });
-
     let activeFolder = document.getElementById('activeDrawFolder')?.value.trim() || "Cable";
     let html = '';
-
     for(let cat in groups) {
         let isAllChecked = groups[cat].length > 0 && groups[cat].every(l => drawnItems.hasLayer(l));
         let isSomeChecked = groups[cat].length > 0 && groups[cat].some(l => drawnItems.hasLayer(l));
         let checkboxState = isAllChecked ? 'checked' : '';
         let indeterminate = (!isAllChecked && isSomeChecked) ? 'data-indeterminate="true"' : '';
         let isActive = (cat === activeFolder);
-
         html += `
         <details ${openFolders.has(cat) ? 'open' : ''} ontoggle="toggleFolderState('${cat}', this.open)" class="mb-2 rounded border p-1 shadow-sm ${isActive ? 'bg-success-subtle border-success' : 'bg-light border-light'}" 
             ondragover="allowDrop(event); this.classList.add('border-primary');" ondragleave="this.classList.remove('border-primary');" ondrop="this.classList.remove('border-primary'); handleDropFeature(event, '${cat}')">
-            
             <summary class="fw-bold ${isActive ? 'text-success' : 'text-dark'}" style="cursor: pointer; user-select: none; list-style: none;">
                 <div class="d-inline-flex align-items-center w-100">
                     <input type="checkbox" class="folder-toggle me-2 form-check-input mt-0" data-folder="${cat}" ${checkboxState} ${indeterminate}> 
@@ -1727,14 +1706,13 @@ window.updateTreeControl = function() {
                 <div id="tree-item-${lid}" class="d-flex align-items-center mb-1 feature-item p-1 rounded" draggable="true" ondragstart="handleDragStart(event, ${lid})" style="cursor: grab;">
                     <input type="checkbox" class="item-toggle me-2 form-check-input mt-0" data-id="${lid}" ${isChecked}>
                     <i class="bi bi-grip-vertical text-muted me-1 small"></i>
-                    <span class="text-truncate small text-secondary fw-semibold hover-primary flex-grow-1" style="cursor: pointer;" onclick="zoomToLayer(${lid})">${name}</span>
+                    <span class="text-truncate small text-secondary fw-semibold hover-primary flex-grow-1" style="cursor: pointer;" onclick="zoomToLayer(${lid})">${escapeHtml(name)}</span>
                 </div>
             `;
         });
         html += `</div></details>`;
     }
     treeContainer.innerHTML = html;
-
     treeContainer.querySelectorAll('.folder-toggle[data-indeterminate="true"]').forEach(chk => chk.indeterminate = true);
     treeContainer.querySelectorAll('.folder-toggle').forEach(chk => {
         chk.addEventListener('change', function() {
@@ -1797,7 +1775,7 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
     const ignoreList = ['name','Name','desc','description','Description','folder','color','weight','iconStyle','length_m','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
     for(let k in props) {
         if(!ignoreList.includes(k) && !k.startsWith('_')) {
-            extraProps += `<tr><th class="small p-1 text-muted" style="width:40%;">${k}</th><td class="small p-1 fw-semibold text-break">${props[k]}</td></tr>`;
+            extraProps += `<tr><th class="small p-1 text-muted" style="width:40%;">${escapeHtml(k)}</th><td class="small p-1 fw-semibold text-break">${escapeHtml(props[k])}</td></tr>`;
         }
     }
     if(extraProps) extraProps = `<div class="mt-2 mb-2" style="max-height:100px; overflow-y:auto;"><table class="table table-sm table-bordered mb-0">${extraProps}</table></div>`;
@@ -1807,10 +1785,10 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
 
     if (isReadOnly) {
         popupContent.innerHTML = `
-            <h6 class="fw-bold mb-1 text-primary border-bottom pb-1">👁 ${stageName} Layer</h6>
-            ${name ? `<div class="fw-bold text-dark mb-1">${name} ${lengthHtml}</div>` : ''}
+            <h6 class="fw-bold mb-1 text-primary border-bottom pb-1">👁 ${escapeHtml(stageName)} Layer</h6>
+            ${name ? `<div class="fw-bold text-dark mb-1">${escapeHtml(name)} ${lengthHtml}</div>` : ''}
             ${coordsHtml}
-            ${desc ? `<div class="small mt-1 text-wrap text-break p-1 bg-light rounded">${desc}</div>` : ''}
+            ${desc ? `<div class="small mt-1 text-wrap text-break p-1 bg-light rounded">${escapeHtml(desc)}</div>` : ''}
             ${extraProps}
         `;
         layer.bindPopup(popupContent);
@@ -1821,11 +1799,11 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
             <div class="row g-2 mb-2">
                 <div class="col-6">
                     <label class="small fw-bold text-muted">Folder:</label>
-                    <input type="text" class="form-control form-control-sm feature-folder border-info fw-bold" value="${folder}">
+                    <input type="text" class="form-control form-control-sm feature-folder border-info fw-bold" value="${escapeHtml(folder)}">
                 </div>
                 <div class="col-6">
                     <label class="small fw-bold text-muted">Item Name:</label>
-                    <input type="text" class="form-control form-control-sm feature-name border-success fw-bold" value="${name}" placeholder="Name...">
+                    <input type="text" class="form-control form-control-sm feature-name border-success fw-bold" value="${escapeHtml(name)}" placeholder="Name...">
                 </div>
             </div>
             <div class="row g-2 mb-2">
@@ -1849,7 +1827,7 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
                 </div>
                 ` : ''}
             </div>
-            ${desc ? `<div class="small mb-2 p-1 bg-light rounded">${desc}</div>` : ''}
+            ${desc ? `<div class="small mb-2 p-1 bg-light rounded">${escapeHtml(desc)}</div>` : ''}
             ${extraProps}
             <div class="d-flex gap-2 mt-2 pt-2 border-top">
                 <button class="btn btn-sm btn-primary flex-grow-1 save-feature-btn"><i class="bi bi-check2-circle me-1"></i>Save</button>
@@ -1859,8 +1837,7 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
         layer.bindPopup(popupContent);
 
         layer.on('popupopen', function() {
-            setTimeout(() => { popupContent.querySelector('.feature-name').focus(); }, 100);
-
+            setTimeout(() => { popupContent.querySelector('.feature-name')?.focus(); }, 100);
             let lid = L.stamp(layer);
             let treeItem = document.getElementById('tree-item-' + lid);
             if(treeItem) {
@@ -1870,7 +1847,6 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
                 treeItem.classList.add('bg-warning-subtle');
                 treeItem.scrollIntoView({behavior: "smooth", block: "center"});
             }
-
             popupContent.querySelector('.save-feature-btn').onclick = function() {
                 let newName = popupContent.querySelector('.feature-name').value;
                 let newFolder = popupContent.querySelector('.feature-folder').value || "Other";
@@ -1889,14 +1865,12 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
                 if(layer instanceof L.Marker) layer.setIcon(createCustomIcon(newColor, newIconStyle));
                 
                 userCreatedFolders.add(newFolder); openFolders.add(newFolder);
-                
                 layer.closePopup();
                 if (newName) {
                     layer.bindTooltip(newName, {permanent: true, direction: "auto", className: "fw-bold text-dark bg-white shadow-sm"}).openTooltip();
                 } else { layer.unbindTooltip(); }
                 updateTreeControl();
             };
-
             popupContent.querySelector('.delete-feature-btn').onclick = function() {
                 if(confirm("මෙම කොටස මැප් එකෙන් සම්පූර්ණයෙන්ම මකා දැමීමට අවශ්‍යද?")) {
                     drawnItems.removeLayer(layer);
@@ -1906,7 +1880,6 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
             };
         });
     }
-
     if (name) {
         layer.bindTooltip(name, {permanent: true, direction: "auto", className: "fw-bold text-dark bg-white shadow-sm"});
     }
@@ -1921,14 +1894,12 @@ document.getElementById('mapStageSelect').addEventListener('change', (e) => {
 
 function loadMapDataForProjectAndStage() {
     drawnItems.clearLayers(); currentStageLayers = [];
-    
     Object.keys(referenceLayers).forEach(stage => {
         if(referenceLayers[stage]) {
             layerControl.removeLayer(referenceLayers[stage]); projectMap.removeLayer(referenceLayers[stage]);
         }
     });
     referenceLayers = {};
-
     if (!currentMapProject) { updateTreeControl(); return; }
 
     const data = allProjectsData[currentMapProject];
@@ -1937,7 +1908,6 @@ function loadMapDataForProjectAndStage() {
             try {
                 const stageData = data.mapStages[currentMapStage];
                 const geojsonData = typeof stageData === 'string' ? JSON.parse(stageData) : stageData;
-                
                 L.geoJSON(geojsonData, {
                     ...geojsonStyleOptions,
                     onEachFeature: function(feature, layer) {
@@ -1958,7 +1928,6 @@ function loadMapDataForProjectAndStage() {
                 try {
                     const refData = data.mapStages[stage];
                     const geojsonData = typeof refData === 'string' ? JSON.parse(refData) : refData;
-                    
                     let refLayerGroup = L.geoJSON(geojsonData, {
                         style: { color: colors[stage] || '#555', dashArray: '5, 5', weight: 2, opacity: 0.8 },
                         pointToLayer: function(feature, latlng) { return L.marker(latlng, {icon: createCustomIcon(colors[stage], 'circle')}); },
@@ -1975,11 +1944,9 @@ function loadMapDataForProjectAndStage() {
 
 document.getElementById('saveMapBtn').addEventListener('click', async () => {
     if (!currentMapProject) { alert("කරුණාකර මුලින්ම Project එකක් තෝරන්න!"); return; }
-    
     let allFeatures = { type: "FeatureCollection", features: [] };
     currentStageLayers.forEach(l => { if(l.toGeoJSON) allFeatures.features.push(l.toGeoJSON()); });
     const geojsonString = JSON.stringify(allFeatures);
-    
     try {
         const updatePath = `mapStages.${currentMapStage}`;
         await updateDoc(doc(db, "osp_projects", currentMapProject), { [updatePath]: geojsonString });
@@ -1993,7 +1960,6 @@ document.getElementById('kmzUpload').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if(!file) return;
     const fileUrl = URL.createObjectURL(file);
-
     if (!kmzParser) {
         kmzParser = L.kmzLayer();
         kmzParser.on('load', function(event) {
@@ -2004,10 +1970,8 @@ document.getElementById('kmzUpload').addEventListener('change', function(e) {
                 l.feature.properties.color = (l instanceof L.Marker) ? '#e11d48' : '#3388ff';
                 l.feature.properties.weight = 3;
                 l.feature.properties.iconStyle = 'circle';
-
                 if (l instanceof L.Marker) l.setIcon(createCustomIcon('#e11d48', 'circle'));
                 else if (l.setStyle) l.setStyle({color: '#3388ff', weight: 3});
-
                 userCreatedFolders.add(folderName); openFolders.add(folderName);
                 bindFeaturePopup(l, l.feature, false, currentMapStage);
                 drawnItems.addLayer(l); currentStageLayers.push(l);
@@ -2021,11 +1985,7 @@ document.getElementById('kmzUpload').addEventListener('change', function(e) {
 });
 
 window.executeExport = function() {
-    if (currentStageLayers.length === 0) { 
-        alert("Export කරන්න Data නැහැ."); 
-        return; 
-    }
-
+    if (currentStageLayers.length === 0) { alert("Export කරන්න Data නැහැ."); return; }
     let scope = document.getElementById('exportScope').value;
     let format = document.getElementById('exportFormat').value;
     let activeFolder = document.getElementById('activeDrawFolder').value.trim();
@@ -2035,18 +1995,13 @@ window.executeExport = function() {
         if(l.toGeoJSON) {
             let geojson = l.toGeoJSON();
             let layerFolder = geojson.properties.folder || "Other";
-            
             if(scope === 'all' || layerFolder === activeFolder) {
                 featuresToExport.push(geojson);
             }
         }
     });
 
-    if (featuresToExport.length === 0) { 
-        alert("තෝරාගත් කොටසේ Export කිරීමට Data නොමැත."); 
-        return; 
-    }
-
+    if (featuresToExport.length === 0) { alert("තෝරාගත් කොටසේ Export කිරීමට Data නොමැත."); return; }
     let featureCollection = { type: "FeatureCollection", features: featuresToExport };
     let dataStr, fileExt;
 
@@ -2062,7 +2017,6 @@ window.executeExport = function() {
     const projectName = currentMapProject ? allProjectsData[currentMapProject].projectName.replace(/\s+/g, '_') : "Project";
     let suffix = scope === 'all' ? "All_Folders" : activeFolder;
     let defaultFileName = `${projectName}_${currentMapStage}_${suffix}${fileExt}`;
-    
     let finalFileName = prompt("ඩවුන්ලෝඩ් වන ෆයිල් එකේ නම ලබා දෙන්න:", defaultFileName);
     if (!finalFileName) return; 
     if (!finalFileName.endsWith(fileExt)) finalFileName += fileExt;
@@ -2070,7 +2024,6 @@ window.executeExport = function() {
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
     downloadAnchorNode.setAttribute("download", finalFileName);
-    
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -2081,12 +2034,10 @@ window.executeExport = function() {
 
 function geoJsonToKML(geoJson) {
     let kml = '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n';
-    
     geoJson.features.forEach((feature, i) => {
         let props = feature.properties || {};
         let name = props.name || props.Name || "Feature " + (i+1);
         let desc = props.desc || props.description || "";
-        
         let htmlColor = props.color || "#3388ff";
         if(htmlColor.startsWith('#')) htmlColor = htmlColor.substring(1);
         let kmlColor = "ff" + htmlColor.substring(4,6) + htmlColor.substring(2,4) + htmlColor.substring(0,2);
@@ -2094,16 +2045,12 @@ function geoJsonToKML(geoJson) {
 
         kml += `<Placemark>\n<name>${escapeXml(name)}</name>\n`;
         if(desc) kml += `<description>${escapeXml(desc)}</description>\n`;
-        
         kml += `<Style><LineStyle><color>${kmlColor}</color><width>${weight}</width></LineStyle><IconStyle><color>${kmlColor}</color></IconStyle></Style>\n`;
-
         kml += `<ExtendedData>\n`;
         let geom = feature.geometry;
-        
         if(geom.type === 'Point') {
             kml += `<Data name="GPS Coordinates"><value>${geom.coordinates[1].toFixed(6)}, ${geom.coordinates[0].toFixed(6)}</value></Data>\n`;
         }
-        
         const ignoreList = ['name','Name','desc','description','Description','color','weight','iconStyle','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
         for(let k in props) {
             if(!ignoreList.includes(k) && !k.startsWith('_')) {
@@ -2111,11 +2058,10 @@ function geoJsonToKML(geoJson) {
             }
         }
         kml += `</ExtendedData>\n`;
-
         if(geom.type === 'Point') {
             kml += `<Point><coordinates>${geom.coordinates[0]},${geom.coordinates[1]}</coordinates></Point>\n`;
         } else if(geom.type === 'LineString') {
-            let coords = geom.coordinates.map(c => `${c[0]},${c[1]}`).join(' ');
+            let coords = geom.geometry ? geom.geometry.coordinates.map(c => `${c[0]},${c[1]}`).join(' ') : geom.coordinates.map(c => `${c[0]},${c[1]}`).join(' ');
             kml += `<LineString><coordinates>${coords}</coordinates></LineString>\n`;
         } else if(geom.type === 'Polygon') {
             let coords = geom.coordinates[0].map(c => `${c[0]},${c[1]}`).join(' ');
@@ -2123,7 +2069,6 @@ function geoJsonToKML(geoJson) {
         }
         kml += `</Placemark>\n`;
     });
-    
     kml += '</Document>\n</kml>';
     return kml;
 }
@@ -2134,37 +2079,75 @@ function escapeXml(unsafe) {
     });
 }
 
-window.renderMapProjectOptions = function() {
-    const mapSelect = document.getElementById("mapProjectSelect");
-    const searchInput = document.getElementById("mapProjectSearchInput");
-    if(!mapSelect || !searchInput) return;
 
-    const searchTerm = searchInput.value.trim().toLowerCase();
-    mapSelect.innerHTML = '<option value="">-- Select a Project --</option>';
+// --- View Projects Table Search Function ---
+window.renderViewProjectsTable = function() {
+    const tableBody = document.getElementById("projectsTableBody");
+    if (!tableBody) return;
+    
+    const searchTerm = document.getElementById("viewProjectsSearchInput")?.value.trim().toLowerCase() || "";
+    tableBody.innerHTML = '';
 
     Object.entries(allProjectsData).forEach(([pid, data]) => {
-        const searchableText = [data.projectName, data.projectNo, data.poNumber, data.invoiceRefNumber, data.sltRefNumber].map(value => String(value || "").toLowerCase()).join(" ");
+        const searchableText = [
+            data.projectName, 
+            data.poNumber, 
+            data.projectNo, 
+            data.invoiceRefNumber,
+            data.sltRefNumber, 
+            data.rtom, 
+            data.lea, 
+            data.projectType,
+            data.invoiceStatus, 
+            data.asbuiltStatus,
+            data.invDrawnBy,
+            data.asbDrawnBy
+        ].map(value => String(value || "").toLowerCase()).join(" ");
+
         if (!searchTerm || searchableText.includes(searchTerm)) {
-            mapSelect.add(new Option(`[${data.projectType}] ${data.projectName}`, pid));
+            const getBadge = (status, by, startDate, compDate) => {
+                if(status === 'Print Pending') {
+                    return `<span class="badge bg-warning text-dark" style="line-height: 1.4; text-align: left;">Print Pending 🖨<br><small>Approved by admin</small></span>`;
+                }
+                if(status === 'Print Complete') {
+                    return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">Print Complete ✔<br><small>Final handoff complete</small></span>`;
+                }
+                if(status === 'Completed') {
+                    return `<span class="badge bg-success" style="line-height: 1.4; text-align: left;">
+                                Completed ✔<br>
+                                <small>
+                                    By: ${getUserDisplayName(by)}<br>
+                                    Start: ${formatDate(startDate)}<br>
+                                    End: ${formatDate(compDate)}
+                                </small>
+                            </span>`;
+                }
+                if(status === 'Preparing') {
+                    return `<span class="badge bg-info text-dark" style="line-height: 1.4; text-align: left;">
+                                Preparing ⏳<br>
+                                <small>
+                                    By: ${getUserDisplayName(by)}<br>
+                                    Start: ${formatDate(startDate)}
+                                </small>
+                            </span>`;
+                }
+                return `<span class="badge bg-warning text-dark">Pending 🕒</span>`;
+            };
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="fw-bold">${escapeHtml(data.projectName)}<br><small class="text-muted">PO: ${escapeHtml(data.poNumber || '-')}</small></td>
+                <td><small>Invoice Ref: ${escapeHtml(data.invoiceRefNumber || '-')}<br>Project No: ${escapeHtml(data.projectNo || '-')}<br>SLT/Request Ref: ${escapeHtml(data.sltRefNumber || '-')}</small></td>
+                <td>${escapeHtml(data.rtom || '-')} / ${escapeHtml(data.lea || '-')}</td>
+                <td><span class="badge bg-secondary">${escapeHtml(data.projectType || '-')}</span></td>
+                <td>${getBadge(data.invoiceStatus, data.invDrawnBy, data.invStartDate, data.invCompleteDate)}</td>
+                <td>${getBadge(data.asbuiltStatus, data.asbDrawnBy, data.asbStartDate, data.asbCompleteDate)}</td>
+                <td>${renderProjectReviewSummary(data)}</td>
+            `;
+            tableBody.appendChild(tr);
         }
     });
 };
-document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
 
-
-window.renderMapProjectOptions = function() {
-    const mapSelect = document.getElementById("mapProjectSelect");
-    const searchInput = document.getElementById("mapProjectSearchInput");
-    if(!mapSelect || !searchInput) return;
-
-    const searchTerm = searchInput.value.trim().toLowerCase();
-    mapSelect.innerHTML = '<option value="">-- Select a Project --</option>';
-
-    Object.entries(allProjectsData).forEach(([pid, data]) => {
-        const searchableText = [data.projectName, data.projectNo, data.poNumber, data.invoiceRefNumber, data.sltRefNumber].map(value => String(value || "").toLowerCase()).join(" ");
-        if (!searchTerm || searchableText.includes(searchTerm)) {
-            mapSelect.add(new Option(`[${data.projectType}] ${data.projectName}`, pid));
-        }
-    });
-};
-document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
+// Search Input එකට Event Listener එකක් එකතු කිරීම
+document.getElementById('viewProjectsSearchInput')?.addEventListener('input', renderViewProjectsTable);
