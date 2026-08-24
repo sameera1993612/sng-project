@@ -75,7 +75,7 @@ function setSidebarCollapsed(collapsed) {
     requestAnimationFrame(setupFloatingTableScrollbar);
 }
 
-setSidebarCollapsed(savedSidebarState);
+setSidebarCollapsed(false);
 sidebarToggle.addEventListener('click', () => setSidebarCollapsed(!sidebar.classList.contains('is-collapsed')));
 
 function setupFloatingTableScrollbar() {
