@@ -1454,7 +1454,7 @@ window.updateTask = async function(pid, type, newStatus) {
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => window.location.href = "login.html"));
 
-// --- Map Save, Load, Layers & Export Functions ---
+    // --- Map Save, Load, Layers & Export Functions ---
 
 let projectMap = null;
 let drawnItems = null;
@@ -1471,16 +1471,31 @@ let userCreatedFolders = new Set(["Cable", "FDP", "FTC", "MH", "Pole", "Road", "
 let openFolders = new Set(["Cable", "FDP", "FTC", "MH", "Pole", "Road", "Joint"]);
 let baseMapsMap = {};
 
-// Custom Point Icon (පාට වෙනස් කරන්න පුළුවන් ලස්සන Dot එකක්)
-function createCustomIcon(color) {
+// Custom Point Icon (Center කර ඇත)
+function createCustomIcon(color, style = 'circle') {
+    let innerHtml = '';
+    
+    if (style === 'square') {
+        innerHtml = `<div style="background-color:${color}; width:16px; height:16px; border:2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`;
+    } else if (style === 'pin') {
+        innerHtml = `<div style="color:${color}; font-size: 26px; line-height: 26px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.6));"><i class="bi bi-geo-alt-fill"></i></div>`;
+    } else if (style === 'star') {
+        innerHtml = `<div style="color:${color}; font-size: 22px; line-height: 22px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.6));"><i class="bi bi-star-fill"></i></div>`;
+    } else {
+        innerHtml = `<div style="background-color:${color}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`;
+    }
+
+    // අයිකන් එක හරියටම Center වෙන්න හැදුවා
+    let htmlContent = `<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%;">${innerHtml}</div>`;
+
     return L.divIcon({
         className: 'custom-div-icon',
-        html: `<div style="background-color:${color}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
-        iconSize: [16,16], iconAnchor: [8,8]
+        html: htmlContent,
+        iconSize: [26, 26], 
+        iconAnchor: [13, 13]
     });
 }
 
-// GeoJSON ලෝඩ් කරද්දී පාට සහ ඩිසයින් හැදීම
 const geojsonStyleOptions = {
     style: function(feature) {
         return {
@@ -1491,7 +1506,8 @@ const geojsonStyleOptions = {
     },
     pointToLayer: function(feature, latlng) {
         let c = feature.properties.color || '#e11d48';
-        return L.marker(latlng, { icon: createCustomIcon(c) });
+        let style = feature.properties.iconStyle || 'circle';
+        return L.marker(latlng, { icon: createCustomIcon(c, style) });
     }
 };
 
@@ -1501,6 +1517,33 @@ window.initMap = function() {
         return;
     }
     
+    // අලුත්: Line වල සුදු කොටු රවුම් කිරීම සහ රෝස කොටුව Center කිරීම
+    if (!document.getElementById('custom-edit-style')) {
+        const style = document.createElement('style');
+        style.id = 'custom-edit-style';
+        style.innerHTML = `
+            /* Line Edit Points (සුදු කොටු -> පොඩි රවුම්) */
+            .leaflet-editing-icon {
+                border-radius: 50% !important;
+                width: 10px !important;
+                height: 10px !important;
+                margin-left: -5px !important;
+                margin-top: -5px !important;
+                background-color: #ffffff !important;
+                border: 2px solid #3388ff !important;
+                box-shadow: 0 0 3px rgba(0,0,0,0.4);
+            }
+            /* Marker Edit Box (රෝස කොටුව) රවුම් කිරීම */
+            .leaflet-edit-marker-selected {
+                background: rgba(254, 87, 161, 0.1) !important;
+                border: 2px dashed rgba(254, 87, 161, 0.6) !important;
+                border-radius: 50% !important;
+                margin: -2px !important; 
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 });
     const googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
     const googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
@@ -1520,7 +1563,6 @@ window.initMap = function() {
     
     layerControl = L.control.layers(baseMapsMap, {}, { collapsed: true, position: 'topleft' }).addTo(projectMap);
 
-    // අලුත් "Folders & Items" Control එක
     customTreeControl = L.control({position: 'topright'});
     customTreeControl.onAdd = function (map) {
         let div = L.DomUtil.create('div', 'leaflet-control bg-white shadow-sm p-2 rounded border');
@@ -1554,7 +1596,6 @@ window.initMap = function() {
     });
     projectMap.addControl(drawControl);
 
-    // අලුතින් අඳින දෙයක් Active Folder එකට දානවා, සහ Auto-Popup වෙනවා
     projectMap.on(L.Draw.Event.CREATED, function (event) {
         const layer = event.layer;
         if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
@@ -1563,13 +1604,13 @@ window.initMap = function() {
         userCreatedFolders.add(targetFolder); openFolders.add(targetFolder);
 
         layer.feature.properties.folder = targetFolder;
-        layer.feature.properties.name = ""; // හිස්ව තියනවා Type කරන්න
+        layer.feature.properties.name = ""; 
         layer.feature.properties.color = (layer instanceof L.Marker) ? '#e11d48' : '#3388ff';
         layer.feature.properties.weight = 3;
+        layer.feature.properties.iconStyle = 'circle';
 
-        // Custom Icon එක සෙට් කිරීම
         if (layer instanceof L.Marker) {
-            layer.setIcon(createCustomIcon(layer.feature.properties.color));
+            layer.setIcon(createCustomIcon(layer.feature.properties.color, layer.feature.properties.iconStyle));
         }
 
         bindFeaturePopup(layer, layer.feature, false, currentMapStage); 
@@ -1577,12 +1618,10 @@ window.initMap = function() {
         currentStageLayers.push(layer);
         updateTreeControl();
         
-        // Auto-Open Popup & Focus
         layer.openPopup();
     });
 };
 
-// --- Folder Rename & Delete ---
 window.renameFolder = function(e, oldName) {
     e.stopPropagation(); e.preventDefault();
     let newName = prompt(`Rename folder '${oldName}' to:`, oldName);
@@ -1610,7 +1649,6 @@ window.deleteFolder = function(e, folderName) {
     }
 };
 
-// --- Folders Create & Drag ---
 window.createNewFolder = function() {
     let input = document.getElementById('activeDrawFolder');
     let fName = input.value.trim();
@@ -1637,7 +1675,6 @@ window.handleDropFeature = function(e, targetFolder) {
     }
 };
 
-// --- Tree Control එක Update කිරීම ---
 window.updateTreeControl = function() {
     let treeContainer = document.getElementById('treeContainer');
     if(!treeContainer) return;
@@ -1731,7 +1768,6 @@ window.zoomToLayer = function(id) {
     }
 };
 
-// --- Popup Settings (Auto-select in Tree, Styling & Length Calculation) ---
 function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Active") {
     let props = (feature && feature.properties) ? feature.properties : {};
     let name = props.name || props.Name || "";
@@ -1739,8 +1775,9 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
     let folder = props.folder || "Other";
     let color = props.color || (layer instanceof L.Marker ? '#e11d48' : '#3388ff');
     let weight = props.weight || 3;
+    let iconStyle = props.iconStyle || "circle";
+    let isMarker = layer instanceof L.Marker;
 
-    // Line එකක් නම් ඒකේ දුර මීටර් වලින් ගණනය කිරීම
     let lengthHtml = "";
     if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
         let latlngs = layer.getLatLngs();
@@ -1757,7 +1794,7 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
     }
 
     let extraProps = "";
-    const ignoreList = ['name','Name','desc','description','Description','folder','color','weight','length_m','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
+    const ignoreList = ['name','Name','desc','description','Description','folder','color','weight','iconStyle','length_m','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
     for(let k in props) {
         if(!ignoreList.includes(k) && !k.startsWith('_')) {
             extraProps += `<tr><th class="small p-1 text-muted" style="width:40%;">${k}</th><td class="small p-1 fw-semibold text-break">${props[k]}</td></tr>`;
@@ -1766,7 +1803,7 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
     if(extraProps) extraProps = `<div class="mt-2 mb-2" style="max-height:100px; overflow-y:auto;"><table class="table table-sm table-bordered mb-0">${extraProps}</table></div>`;
 
     let popupContent = document.createElement('div');
-    popupContent.style.minWidth = "250px";
+    popupContent.style.minWidth = "260px";
 
     if (isReadOnly) {
         popupContent.innerHTML = `
@@ -1792,14 +1829,25 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
                 </div>
             </div>
             <div class="row g-2 mb-2">
-                <div class="col-6">
+                <div class="${isMarker ? 'col-4' : 'col-6'}">
                     <label class="small fw-bold text-muted">Color:</label>
                     <input type="color" class="form-control form-control-sm form-control-color w-100 feature-color" value="${color}">
                 </div>
-                <div class="col-6">
-                    <label class="small fw-bold text-muted">Size / Thikness:</label>
+                <div class="${isMarker ? 'col-4' : 'col-6'}">
+                    <label class="small fw-bold text-muted">Size:</label>
                     <input type="number" class="form-control form-control-sm feature-weight" value="${weight}" min="1" max="15">
                 </div>
+                ${isMarker ? `
+                <div class="col-4">
+                    <label class="small fw-bold text-muted">Icon:</label>
+                    <select class="form-select form-select-sm feature-icon-style border-info">
+                        <option value="circle" ${iconStyle==='circle'?'selected':''}>Circle</option>
+                        <option value="square" ${iconStyle==='square'?'selected':''}>Square</option>
+                        <option value="pin" ${iconStyle==='pin'?'selected':''}>Pin</option>
+                        <option value="star" ${iconStyle==='star'?'selected':''}>Star</option>
+                    </select>
+                </div>
+                ` : ''}
             </div>
             ${desc ? `<div class="small mb-2 p-1 bg-light rounded">${desc}</div>` : ''}
             ${extraProps}
@@ -1810,12 +1858,9 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
         `;
         layer.bindPopup(popupContent);
 
-        // Popup එක Open වෙද්දී
         layer.on('popupopen', function() {
-            // Auto Focus to Name
             setTimeout(() => { popupContent.querySelector('.feature-name').focus(); }, 100);
 
-            // දකුණු පැත්තේ Tree එකෙන් Auto Select වීම
             let lid = L.stamp(layer);
             let treeItem = document.getElementById('tree-item-' + lid);
             if(treeItem) {
@@ -1826,22 +1871,22 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
                 treeItem.scrollIntoView({behavior: "smooth", block: "center"});
             }
 
-            // Save Button
             popupContent.querySelector('.save-feature-btn').onclick = function() {
                 let newName = popupContent.querySelector('.feature-name').value;
                 let newFolder = popupContent.querySelector('.feature-folder').value || "Other";
                 let newColor = popupContent.querySelector('.feature-color').value;
                 let newWeight = parseInt(popupContent.querySelector('.feature-weight').value) || 3;
+                let newIconStyle = isMarker ? popupContent.querySelector('.feature-icon-style').value : null;
                 
                 if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
                 layer.feature.properties.name = newName;
                 layer.feature.properties.folder = newFolder;
                 layer.feature.properties.color = newColor;
                 layer.feature.properties.weight = newWeight;
+                if(newIconStyle) layer.feature.properties.iconStyle = newIconStyle;
                 
-                // Style Apply කිරීම
                 if(layer.setStyle) layer.setStyle({color: newColor, weight: newWeight});
-                if(layer instanceof L.Marker) layer.setIcon(createCustomIcon(newColor));
+                if(layer instanceof L.Marker) layer.setIcon(createCustomIcon(newColor, newIconStyle));
                 
                 userCreatedFolders.add(newFolder); openFolders.add(newFolder);
                 
@@ -1852,7 +1897,6 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
                 updateTreeControl();
             };
 
-            // Delete Button
             popupContent.querySelector('.delete-feature-btn').onclick = function() {
                 if(confirm("මෙම කොටස මැප් එකෙන් සම්පූර්ණයෙන්ම මකා දැමීමට අවශ්‍යද?")) {
                     drawnItems.removeLayer(layer);
@@ -1868,7 +1912,6 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
     }
 }
 
-// Project / Stage මාරු කිරීම
 document.getElementById('mapProjectSelect').addEventListener('change', (e) => {
     currentMapProject = e.target.value; loadMapDataForProjectAndStage();
 });
@@ -1890,7 +1933,6 @@ function loadMapDataForProjectAndStage() {
 
     const data = allProjectsData[currentMapProject];
     if (data && data.mapStages) {
-        // 1. Active Stage Load කිරීම
         if (data.mapStages[currentMapStage]) {
             try {
                 const stageData = data.mapStages[currentMapStage];
@@ -1910,7 +1952,6 @@ function loadMapDataForProjectAndStage() {
             } catch (e) { console.error(e); }
         }
 
-        // 2. Reference Stages Load කිරීම
         const colors = { "HLD": "#3388ff", "LLD": "#9c27b0", "PAT": "#ff9800", "FINAL": "#4caf50" };
         Object.keys(data.mapStages).forEach(stage => {
             if (stage !== currentMapStage) {
@@ -1920,7 +1961,7 @@ function loadMapDataForProjectAndStage() {
                     
                     let refLayerGroup = L.geoJSON(geojsonData, {
                         style: { color: colors[stage] || '#555', dashArray: '5, 5', weight: 2, opacity: 0.8 },
-                        pointToLayer: function(feature, latlng) { return L.marker(latlng, {icon: createCustomIcon(colors[stage])}); },
+                        pointToLayer: function(feature, latlng) { return L.marker(latlng, {icon: createCustomIcon(colors[stage], 'circle')}); },
                         onEachFeature: function(feature, layer) { bindFeaturePopup(layer, feature, true, stage); }
                     });
                     referenceLayers[stage] = refLayerGroup;
@@ -1962,8 +2003,9 @@ document.getElementById('kmzUpload').addEventListener('change', function(e) {
                 l.feature.properties.folder = folderName;
                 l.feature.properties.color = (l instanceof L.Marker) ? '#e11d48' : '#3388ff';
                 l.feature.properties.weight = 3;
+                l.feature.properties.iconStyle = 'circle';
 
-                if (l instanceof L.Marker) l.setIcon(createCustomIcon('#e11d48'));
+                if (l instanceof L.Marker) l.setIcon(createCustomIcon('#e11d48', 'circle'));
                 else if (l.setStyle) l.setStyle({color: '#3388ff', weight: 3});
 
                 userCreatedFolders.add(folderName); openFolders.add(folderName);
@@ -1977,9 +2019,6 @@ document.getElementById('kmzUpload').addEventListener('change', function(e) {
     kmzParser.load(fileUrl);
     e.target.value = ''; 
 });
-
-// --- Map Export Functions (KML & GeoJSON, All vs Folder) ---
-// --- Map Export Functions (KML & GeoJSON, All vs Folder) ---
 
 window.executeExport = function() {
     if (currentStageLayers.length === 0) { 
@@ -1997,7 +2036,6 @@ window.executeExport = function() {
             let geojson = l.toGeoJSON();
             let layerFolder = geojson.properties.folder || "Other";
             
-            // Scope එක All නම් ඔක්කොම ගන්නවා, Folder නම් Active එක විතරක් ගන්නවා
             if(scope === 'all' || layerFolder === activeFolder) {
                 featuresToExport.push(geojson);
             }
@@ -2016,7 +2054,6 @@ window.executeExport = function() {
         dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(featureCollection));
         fileExt = ".geojson";
     } else {
-        // GeoJSON එක KML බවට පත් කිරීම
         let kmlString = geoJsonToKML(featureCollection);
         dataStr = "data:application/vnd.google-earth.kml+xml;charset=utf-8," + encodeURIComponent(kmlString);
         fileExt = ".kml";
@@ -2026,10 +2063,8 @@ window.executeExport = function() {
     let suffix = scope === 'all' ? "All_Folders" : activeFolder;
     let defaultFileName = `${projectName}_${currentMapStage}_${suffix}${fileExt}`;
     
-    // ෆයිල් එකේ නම වෙනස් කරන්න දෙන Prompt එක
     let finalFileName = prompt("ඩවුන්ලෝඩ් වන ෆයිල් එකේ නම ලබා දෙන්න:", defaultFileName);
-    
-    if (!finalFileName) return; // Cancel කළොත් නවතිනවා
+    if (!finalFileName) return; 
     if (!finalFileName.endsWith(fileExt)) finalFileName += fileExt;
 
     const downloadAnchorNode = document.createElement('a');
@@ -2040,12 +2075,10 @@ window.executeExport = function() {
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
 
-    // Modal එක වසා දැමීම
     let exportModal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
     if(exportModal) exportModal.hide();
 };
 
-// GeoJSON => KML Converter (අමතර Attributes සහ GPS සමඟ)
 function geoJsonToKML(geoJson) {
     let kml = '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n';
     
@@ -2054,7 +2087,6 @@ function geoJsonToKML(geoJson) {
         let name = props.name || props.Name || "Feature " + (i+1);
         let desc = props.desc || props.description || "";
         
-        // පාට සකස් කිරීම (HTML HEX -> KML aabbggrr)
         let htmlColor = props.color || "#3388ff";
         if(htmlColor.startsWith('#')) htmlColor = htmlColor.substring(1);
         let kmlColor = "ff" + htmlColor.substring(4,6) + htmlColor.substring(2,4) + htmlColor.substring(0,2);
@@ -2065,17 +2097,14 @@ function geoJsonToKML(geoJson) {
         
         kml += `<Style><LineStyle><color>${kmlColor}</color><width>${weight}</width></LineStyle><IconStyle><color>${kmlColor}</color></IconStyle></Style>\n`;
 
-        // Attribute / Data ටික Table එකක් විදිහට සේව් වීම (ExtendedData)
         kml += `<ExtendedData>\n`;
         let geom = feature.geometry;
         
-        // Point එකක් නම් GPS එක වෙනම Attribute එකක් විදිහට දානවා
         if(geom.type === 'Point') {
             kml += `<Data name="GPS Coordinates"><value>${geom.coordinates[1].toFixed(6)}, ${geom.coordinates[0].toFixed(6)}</value></Data>\n`;
         }
         
-        // අනිත් ඔක්කොම Attributes ටික KML එකට දානවා
-        const ignoreList = ['name','Name','desc','description','Description','color','weight','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
+        const ignoreList = ['name','Name','desc','description','Description','color','weight','iconStyle','styleUrl','styleHash','styleMapHash','icon-scale','icon','visibility','fill','fill-opacity','stroke','stroke-opacity','stroke-width'];
         for(let k in props) {
             if(!ignoreList.includes(k) && !k.startsWith('_')) {
                 kml += `<Data name="${escapeXml(k)}"><value>${escapeXml(String(props[k]))}</value></Data>\n`;
@@ -2083,7 +2112,6 @@ function geoJsonToKML(geoJson) {
         }
         kml += `</ExtendedData>\n`;
 
-        // Geometry එක අඳින විදිහ
         if(geom.type === 'Point') {
             kml += `<Point><coordinates>${geom.coordinates[0]},${geom.coordinates[1]}</coordinates></Point>\n`;
         } else if(geom.type === 'LineString') {
@@ -2106,9 +2134,22 @@ function escapeXml(unsafe) {
     });
 }
 
+window.renderMapProjectOptions = function() {
+    const mapSelect = document.getElementById("mapProjectSelect");
+    const searchInput = document.getElementById("mapProjectSearchInput");
+    if(!mapSelect || !searchInput) return;
 
+    const searchTerm = searchInput.value.trim().toLowerCase();
+    mapSelect.innerHTML = '<option value="">-- Select a Project --</option>';
 
-
+    Object.entries(allProjectsData).forEach(([pid, data]) => {
+        const searchableText = [data.projectName, data.projectNo, data.poNumber, data.invoiceRefNumber, data.sltRefNumber].map(value => String(value || "").toLowerCase()).join(" ");
+        if (!searchTerm || searchableText.includes(searchTerm)) {
+            mapSelect.add(new Option(`[${data.projectType}] ${data.projectName}`, pid));
+        }
+    });
+};
+document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
 
 
 window.renderMapProjectOptions = function() {
