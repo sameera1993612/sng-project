@@ -345,9 +345,10 @@ async function loadDashboardData() {
 
     document.getElementById("totProjects").innerText = count;
     document.getElementById("totValue").innerText = totalVal.toLocaleString('en-US', {minimumFractionDigits: 2});
-    renderSummary(summaryMode === "all" ? querySnapshot.docs.map(item => item.data()) : querySnapshot.docs.map(item => item.data()).filter(data =>
-        data.invDrawnBy === currentUserEmail || data.asbDrawnBy === currentUserEmail
-    ));
+    renderSummary(
+        querySnapshot.docs.map(item => item.data()).filter(data => data.invDrawnBy === currentUserEmail || data.asbDrawnBy === currentUserEmail),
+        querySnapshot.docs.map(item => item.data())
+    );
     renderAdminProjects();
     renderAdminReviews();
     renderPrintQueue();
@@ -797,34 +798,54 @@ window.resolveIssue = async function(pid, createdAt) {
     }
 };
 
-function renderSummary(projects) {
-    const statuses = { Pending: 0, Preparing: 0, Completed: 0 };
-    const invoiceStatuses = { ...statuses };
-    const asbuiltStatuses = { ...statuses };
-    const invoiceAmounts = { Pending: 0, Preparing: 0, Completed: 0 };
+function renderSummary(userProjects, allProjectsList = null) {
+    const allProjectsDataList = allProjectsList || Object.values(allProjectsData);
 
-    projects.forEach(data => {
-        invoiceStatuses[data.invoiceStatus] = (invoiceStatuses[data.invoiceStatus] || 0) + 1;
-        asbuiltStatuses[data.asbuiltStatus] = (asbuiltStatuses[data.asbuiltStatus] || 0) + 1;
-        invoiceAmounts[data.invoiceStatus] = (invoiceAmounts[data.invoiceStatus] || 0) + (Number(data.invoiceAmount) || 0);
-        const projectStatus = data.invoiceStatus === "Completed" && data.asbuiltStatus === "Completed"
-            ? "Completed" : data.invoiceStatus === "Preparing" || data.asbuiltStatus === "Preparing"
-                ? "Preparing" : "Pending";
-        statuses[projectStatus]++;
+    // 1. මුළු සිස්ටම් එකේම Projects Status ගණනය කිරීම (All Projects Counts)
+    const globalProjectStatuses = { Pending: 0, Preparing: 0, Completed: 0 };
+    allProjectsDataList.forEach(data => {
+        const projectStatus = (data.invoiceStatus === "Completed" || data.invoiceStatus === "Print Complete") &&
+                              (data.asbuiltStatus === "Completed" || data.asbuiltStatus === "Print Complete")
+            ? "Completed" 
+            : (data.invoiceStatus === "Preparing" || data.asbuiltStatus === "Preparing")
+                ? "Preparing" 
+                : "Pending";
+        globalProjectStatuses[projectStatus]++;
     });
 
-    const setCounts = (prefix, values) => {
-        document.getElementById(`${prefix}PendingCount`).innerText = values.Pending || 0;
-        document.getElementById(`${prefix}OngoingCount`).innerText = values.Preparing || 0;
-        document.getElementById(`${prefix}CompleteCount`).innerText = values.Completed || 0;
-    };
-    setCounts("project", statuses);
-    setCounts("invoice", invoiceStatuses);
-    setCounts("asbuilt", asbuiltStatuses);
-    document.getElementById("invoicePendingAmount").innerText = formatAmount(invoiceAmounts.Pending);
-    document.getElementById("invoiceOngoingAmount").innerText = formatAmount(invoiceAmounts.Preparing);
-    document.getElementById("invoiceCompleteAmount").innerText = formatAmount(invoiceAmounts.Completed);
-    document.getElementById("summaryScope").innerText = (isAdmin || isViewer()) ? "All project records" : "Projects started or completed by you";
+    // 2. අදාළ User ගේ Drawings සහ Invoices ගණනය කිරීම (My Work Counts)
+    const targetProjects = (summaryMode === "all" || isAdmin || isViewer()) ? allProjectsDataList : userProjects;
+    const invoiceStatuses = { Pending: 0, Preparing: 0, Completed: 0 };
+    const asbuiltStatuses = { Pending: 0, Preparing: 0, Completed: 0 };
+    const invoiceAmounts = { Pending: 0, Preparing: 0, Completed: 0 };
+
+    targetProjects.forEach(data => {
+        const invSt = ["Completed", "Print Complete", "Print Pending"].includes(data.invoiceStatus) ? "Completed" : (data.invoiceStatus || "Pending");
+        const asbSt = ["Completed", "Print Complete", "Print Pending"].includes(data.asbuiltStatus) ? "Completed" : (data.asbuiltStatus || "Pending");
+
+        invoiceStatuses[invSt] = (invoiceStatuses[invSt] || 0) + 1;
+        asbuiltStatuses[asbSt] = (asbuiltStatuses[asbSt] || 0) + 1;
+        invoiceAmounts[invSt] = (invoiceAmounts[invSt] || 0) + (Number(data.invoiceAmount) || 0);
+    });
+
+    // Projects කාඩ් එකට All Projects අගයන් යෙදීම
+    document.getElementById("projectPendingCount").innerText = globalProjectStatuses.Pending || 0;
+    document.getElementById("projectOngoingCount").innerText = globalProjectStatuses.Preparing || 0;
+    document.getElementById("projectCompleteCount").innerText = globalProjectStatuses.Completed || 0;
+
+    // Drawings කාඩ් වලට User ගේ අගයන් යෙදීම
+    document.getElementById("invoicePendingCount").innerText = invoiceStatuses.Pending || 0;
+    document.getElementById("invoiceOngoingCount").innerText = invoiceStatuses.Preparing || 0;
+    document.getElementById("invoiceCompleteCount").innerText = invoiceStatuses.Completed || 0;
+
+    document.getElementById("asbuiltPendingCount").innerText = asbuiltStatuses.Pending || 0;
+    document.getElementById("asbuiltOngoingCount").innerText = asbuiltStatuses.Preparing || 0;
+    document.getElementById("asbuiltCompleteCount").innerText = asbuiltStatuses.Completed || 0;
+
+    if(document.getElementById("invoicePendingAmount")) document.getElementById("invoicePendingAmount").innerText = formatAmount(invoiceAmounts.Pending);
+    if(document.getElementById("invoiceOngoingAmount")) document.getElementById("invoiceOngoingAmount").innerText = formatAmount(invoiceAmounts.Preparing);
+    if(document.getElementById("invoiceCompleteAmount")) document.getElementById("invoiceCompleteAmount").innerText = formatAmount(invoiceAmounts.Completed);
+    if(document.getElementById("summaryScope")) document.getElementById("summaryScope").innerText = (isAdmin || isViewer()) ? "All project records" : "Projects: System Total | Drawings: Started or completed by you";
 }
 
 function formatAmount(amount) {
