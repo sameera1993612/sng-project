@@ -2717,3 +2717,167 @@ window.editRefMapStyle = function(id, mapName) {
         }
     };
 };
+
+
+// ==========================================
+// DISTANCE MEASURE & SCREENSHOT TOOLS
+// ==========================================
+
+let isMeasuring = false;
+let measurePoints = [];
+let measureMarkers = [];
+let measurePolyline = null;
+let measureTooltip = null;
+
+// --- 1. Interactive Path Distance Measurement Tool ---
+window.toggleMeasureTool = function() {
+    isMeasuring = !isMeasuring;
+    const btn = document.getElementById("measureDistanceBtn");
+
+    if (isMeasuring) {
+        btn.classList.remove("btn-outline-primary");
+        btn.classList.add("btn-danger");
+        btn.innerHTML = `<i class="bi bi-x-circle me-1"></i> Stop Measuring`;
+        
+        if (projectMap) {
+            projectMap.getContainer().style.cursor = "crosshair";
+            projectMap.on('click', handleMeasureClick);
+            projectMap.on('mousemove', handleMeasureMove);
+        }
+    } else {
+        clearMeasurement();
+        btn.classList.remove("btn-danger");
+        btn.classList.add("btn-outline-primary");
+        btn.innerHTML = `<i class="bi bi-rulers me-1"></i> Measure Distance`;
+        
+        if (projectMap) {
+            projectMap.getContainer().style.cursor = "";
+            projectMap.off('click', handleMeasureClick);
+            projectMap.off('mousemove', handleMeasureMove);
+        }
+    }
+};
+
+function handleMeasureClick(e) {
+    if (!isMeasuring || !projectMap) return;
+    
+    const latlng = e.latlng;
+    measurePoints.push(latlng);
+
+    // Marker for clicked point
+    const marker = L.circleMarker(latlng, {
+        radius: 5,
+        color: '#dc2626',
+        fillColor: '#ffffff',
+        fillOpacity: 1,
+        weight: 2
+    }).addTo(projectMap);
+    measureMarkers.push(marker);
+
+    // Calculate total distance so far
+    let totalDist = 0;
+    for (let i = 0; i < measurePoints.length - 1; i++) {
+        totalDist += measurePoints[i].distanceTo(measurePoints[i+1]);
+    }
+
+    let distText = totalDist >= 1000 
+        ? `${(totalDist / 1000).toFixed(3)} km` 
+        : `${totalDist.toFixed(1)} m`;
+
+    marker.bindTooltip(measurePoints.length === 1 ? "Start Point" : distText, {
+        permanent: true,
+        direction: "top",
+        className: "bg-dark text-white px-2 py-1 small rounded border-0 fw-bold shadow-sm"
+    }).openTooltip();
+
+    if (!measurePolyline) {
+        measurePolyline = L.polyline(measurePoints, {
+            color: '#dc2626',
+            weight: 3,
+            dashArray: '6, 6'
+        }).addTo(projectMap);
+    } else {
+        measurePolyline.setLatLngs(measurePoints);
+    }
+}
+
+function handleMeasureMove(e) {
+    if (!isMeasuring || measurePoints.length === 0 || !projectMap) return;
+
+    const currentPoints = [...measurePoints, e.latlng];
+    if (measurePolyline) {
+        measurePolyline.setLatLngs(currentPoints);
+    }
+
+    let totalDist = 0;
+    for (let i = 0; i < currentPoints.length - 1; i++) {
+        totalDist += currentPoints[i].distanceTo(currentPoints[i+1]);
+    }
+
+    let distText = totalDist >= 1000 
+        ? `${(totalDist / 1000).toFixed(3)} km` 
+        : `${totalDist.toFixed(1)} m`;
+
+    if (!measureTooltip) {
+        measureTooltip = L.tooltip({
+            sticky: true,
+            direction: 'right',
+            offset: [15, 0],
+            className: 'bg-danger text-white px-2 py-1 small rounded border-0 fw-bold shadow'
+        }).setContent(`Total: ${distText}`).setLatLng(e.latlng);
+        projectMap.openTooltip(measureTooltip);
+    } else {
+        measureTooltip.setContent(`Total: ${distText}`).setLatLng(e.latlng);
+    }
+}
+
+function clearMeasurement() {
+    measurePoints = [];
+    measureMarkers.forEach(m => projectMap && projectMap.removeLayer(m));
+    measureMarkers = [];
+    if (measurePolyline && projectMap) {
+        projectMap.removeLayer(measurePolyline);
+        measurePolyline = null;
+    }
+    if (measureTooltip && projectMap) {
+        projectMap.closeTooltip(measureTooltip);
+        measureTooltip = null;
+    }
+}
+
+// --- 2. Map Screenshot Capture Tool ---
+window.captureMapScreenshot = function() {
+    const mapContainer = document.getElementById("projectMap");
+    if (!mapContainer) {
+        alert("Map element not found.");
+        return;
+    }
+
+    const btn = document.getElementById("mapScreenshotBtn");
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Capturing...`;
+
+    html2canvas(mapContainer, {
+        useCORS: true,
+        allowTaint: true,
+        ignoreElements: (el) => el.classList.contains('leaflet-control-container') && !el.classList.contains('leaflet-top')
+    }).then(canvas => {
+        const link = document.createElement("a");
+        const projectName = currentMapProject && allProjectsData[currentMapProject] 
+            ? allProjectsData[currentMapProject].projectName.replace(/\s+/g, '_') 
+            : "Map";
+        const fileName = `${projectName}_${currentMapStage}_Screenshot_${new Date().toISOString().slice(0, 10)}.png`;
+        
+        link.download = fileName;
+        link.href = canvas.toDataURL("image/png");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }).catch(err => {
+        alert("Screenshot failed: " + err.message);
+    }).finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+};

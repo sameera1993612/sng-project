@@ -19,6 +19,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://unpkg.com/leaflet-kmz@latest/dist/leaflet-kmz.js"></script>
+    <!-- html2canvas for Screenshot -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Leaflet GeometryUtil for precise distance calculations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.geometryutil/0.10.3/leaflet.geometryutil.min.js"></script>
 </head>
 <body>
 
@@ -533,6 +537,12 @@
                         </div>
                         <button id="saveMapBtn" class="btn btn-sm btn-success fw-bold admin-only-map-tools"><i class="bi bi-cloud-arrow-up-fill me-1"></i> Save Map</button>
                         <button type="button" class="btn btn-sm btn-outline-dark fw-bold" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="bi bi-download me-1"></i> Export Data</button>
+                        <button type="button" id="measureDistanceBtn" class="btn btn-sm btn-outline-primary fw-bold" onclick="toggleMeasureTool()">
+                        <i class="bi bi-rulers me-1"></i> Measure Distance
+                    </button>
+                    <button type="button" id="mapScreenshotBtn" class="btn btn-sm btn-outline-secondary fw-bold" onclick="captureMapScreenshot()">
+                        <i class="bi bi-camera-fill me-1"></i> Screenshot
+                    </button>
                     </div>
                 </div>
                 <div class="card shadow border-0 rounded-4 mb-4">
