@@ -878,7 +878,7 @@ window.renderMapProjectOptions = function() {
 
 document.getElementById('mapProjectSearchInput')?.addEventListener('input', renderMapProjectOptions);
 
-// --- User Management Functions (Table Render, Role Update, Reset Password, Delete) ---
+// --- User Management Functions (Table Render, Role Update, Reset Password, Delete) ----
 async function renderUsersTable() {
     const tableBody = document.getElementById("usersTableBody");
     if (!tableBody || !isAdmin) return;
