@@ -21,6 +21,10 @@ const selectedAdminProjectIds = new Set();
 let activeTableScrollContainer = null;
 let activeTableScrollHandler = null;
 
+// Global Reference Maps
+let globalRefMapsData = {};
+let activeGlobalRefLayers = {};
+
 const isViewer = () => currentUserRole === "viewer";
 const canManageWorkspace = () => isAdmin;
 
@@ -976,7 +980,7 @@ onAuthStateChanged(auth, async (user) => {
                 String(storedEmail || "").toLowerCase() === user.email.toLowerCase();
             return sameUser;
         });
-        currentUserRole = String(currentUserDoc?.data().role || "user").toLowerCase();
+        currentUserRole = String(currentUserDoc?.data()?.role || "user").toLowerCase();
         isAdmin = ["admin", "superadmin"].includes(currentUserRole);
         
         // Viewer හෝ Admin සඳහා summaryMode එක "all" ලෙස සෙට් කරයි (සියලුම ප්‍රොජෙක්ට්ස් සාරාංශය පෙන්වීමට)
@@ -1006,6 +1010,10 @@ onAuthStateChanged(auth, async (user) => {
         }
         
         showSection('homeSection', 'nav-home');
+        // Load Reference Maps safely
+        if (typeof window.loadGlobalRefMaps === 'function') {
+            window.loadGlobalRefMaps().catch(e => console.error("Map load error:", e));
+        }
         if ((isAdmin || isViewer()) && !projectListener) {
             projectListener = onSnapshot(collection(db, "osp_projects"), () => {
                 loadDashboardData();
@@ -1897,8 +1905,10 @@ window.updateTreeControl = function() {
         let indeterminate = (!isAllChecked && isSomeChecked) ? 'data-indeterminate="true"' : '';
         let isActive = (cat === activeFolder);
         
-        let viewerActions = isViewer() ? '' : `
+        // අලුත්: Palette අයිකන් එක
+let viewerActions = isViewer() ? '' : `
             <span class="ms-auto me-2">
+                <i class="bi bi-palette-fill text-success ms-1" title="Change Folder Style" onclick="editFolderStyle(event, '${cat}')"></i>
                 <i class="bi bi-pencil-square text-primary ms-1" title="Rename" onclick="renameFolder(event, '${cat}')"></i>
                 <i class="bi bi-trash text-danger ms-1" title="Delete" onclick="deleteFolder(event, '${cat}')"></i>
             </span>
@@ -1970,7 +1980,7 @@ window.zoomToLayer = function(id) {
     }
 };
 
-function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Active") {
+function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Active", refMapId = null) {
     let readOnly = isViewer() || isReadOnly;
     let props = (feature && feature.properties) ? feature.properties : {};
     let name = props.name || props.Name || "";
@@ -1993,7 +2003,12 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
     let coordsHtml = "";
     if (layer.getLatLng) { 
         let ll = layer.getLatLng();
-        coordsHtml = `<div class="mb-2 small text-danger fw-bold"><i class="bi bi-geo-alt-fill"></i> (${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)})</div>`;
+        let gpsText = `${ll.lat.toFixed(6)},${ll.lng.toFixed(6)}`;
+        coordsHtml = `
+        <div class="mb-2 small text-danger fw-bold d-flex align-items-center">
+            <i class="bi bi-geo-alt-fill me-1"></i> <span class="user-select-all me-2">${gpsText}</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="navigator.clipboard.writeText('${gpsText}'); alert('GPS Copied!');" title="Copy GPS"><i class="bi bi-copy"></i></button>
+        </div>`;
     }
 
     let extraProps = "";
@@ -2003,10 +2018,10 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
             extraProps += `<tr><th class="small p-1 text-muted" style="width:40%;">${escapeHtml(k)}</th><td class="small p-1 fw-semibold text-break">${escapeHtml(props[k])}</td></tr>`;
         }
     }
-    if(extraProps) extraProps = `<div class="mt-2 mb-2" style="max-height:100px; overflow-y:auto;"><table class="table table-sm table-bordered mb-0">${extraProps}</table></div>`;
+    if(extraProps) extraProps = `<div class="mt-2 mb-2" style="max-height:150px; overflow-y:auto;"><table class="table table-sm table-bordered mb-0">${extraProps}</table></div>`;
 
     let popupContent = document.createElement('div');
-    popupContent.style.minWidth = "260px";
+    popupContent.style.minWidth = "280px";
 
     if (readOnly) {
         popupContent.innerHTML = `
@@ -2063,16 +2078,20 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
 
         layer.on('popupopen', function() {
             setTimeout(() => { popupContent.querySelector('.feature-name')?.focus(); }, 100);
-            let lid = L.stamp(layer);
-            let treeItem = document.getElementById('tree-item-' + lid);
-            if(treeItem) {
-                let details = treeItem.closest('details');
-                if(details) details.open = true;
-                document.querySelectorAll('.feature-item').forEach(el => el.classList.remove('bg-warning-subtle'));
-                treeItem.classList.add('bg-warning-subtle');
-                treeItem.scrollIntoView({behavior: "smooth", block: "center"});
+            
+            if (!refMapId) {
+                let lid = L.stamp(layer);
+                let treeItem = document.getElementById('tree-item-' + lid);
+                if(treeItem) {
+                    let details = treeItem.closest('details');
+                    if(details) details.open = true;
+                    document.querySelectorAll('.feature-item').forEach(el => el.classList.remove('bg-warning-subtle'));
+                    treeItem.classList.add('bg-warning-subtle');
+                    treeItem.scrollIntoView({behavior: "smooth", block: "center"});
+                }
             }
-            popupContent.querySelector('.save-feature-btn').onclick = function() {
+
+            popupContent.querySelector('.save-feature-btn').onclick = async function() {
                 let newName = popupContent.querySelector('.feature-name').value;
                 let newFolder = popupContent.querySelector('.feature-folder').value || "Other";
                 let newColor = popupContent.querySelector('.feature-color').value;
@@ -2089,18 +2108,55 @@ function bindFeaturePopup(layer, feature, isReadOnly = false, stageName = "Activ
                 if(layer.setStyle) layer.setStyle({color: newColor, weight: newWeight});
                 if(layer instanceof L.Marker) layer.setIcon(createCustomIcon(newColor, newIconStyle));
                 
-                userCreatedFolders.add(newFolder); openFolders.add(newFolder);
                 layer.closePopup();
                 if (newName) {
                     layer.bindTooltip(newName, {permanent: true, direction: "auto", className: "fw-bold text-dark bg-white shadow-sm"}).openTooltip();
                 } else { layer.unbindTooltip(); }
-                updateTreeControl();
-            };
-            popupContent.querySelector('.delete-feature-btn').onclick = function() {
-                if(confirm("මෙම කොටස මැප් එකෙන් සම්පූර්ණයෙන්ම මකා දැමීමට අවශ්‍යද?")) {
-                    drawnItems.removeLayer(layer);
-                    currentStageLayers = currentStageLayers.filter(l => l !== layer);
+
+                if (refMapId) {
+                    let allFeatures = { type: "FeatureCollection", features: [] };
+                    activeGlobalRefLayers[refMapId].eachLayer(l => {
+                        if(l.toGeoJSON) {
+                            let f = l.toGeoJSON();
+                            if(l.feature && l.feature.properties) f.properties = { ...l.feature.properties };
+                            allFeatures.features.push(f);
+                        }
+                    });
+                    globalRefMapsData[refMapId].geoJson = JSON.stringify(allFeatures);
+                    try {
+                        await updateDoc(doc(db, "global_reference_maps", refMapId), { geoJson: globalRefMapsData[refMapId].geoJson });
+                    } catch (err) {
+                        alert("Error saving Ref Map edit: " + err.message);
+                    }
+                } else {
+                    userCreatedFolders.add(newFolder); openFolders.add(newFolder);
                     updateTreeControl();
+                }
+            };
+            
+            popupContent.querySelector('.delete-feature-btn').onclick = async function() {
+                if(confirm("මෙම කොටස මැප් එකෙන් සම්පූර්ණයෙන්ම මකා දැමීමට අවශ්‍යද?")) {
+                    if (refMapId) {
+                        activeGlobalRefLayers[refMapId].removeLayer(layer);
+                        let allFeatures = { type: "FeatureCollection", features: [] };
+                        activeGlobalRefLayers[refMapId].eachLayer(l => {
+                            if(l.toGeoJSON) {
+                                let f = l.toGeoJSON();
+                                if(l.feature && l.feature.properties) f.properties = { ...l.feature.properties };
+                                allFeatures.features.push(f);
+                            }
+                        });
+                        globalRefMapsData[refMapId].geoJson = JSON.stringify(allFeatures);
+                        try {
+                            await updateDoc(doc(db, "global_reference_maps", refMapId), { geoJson: globalRefMapsData[refMapId].geoJson });
+                        } catch (err) {
+                            alert("Error removing from Ref Map: " + err.message);
+                        }
+                    } else {
+                        drawnItems.removeLayer(layer);
+                        currentStageLayers = currentStageLayers.filter(l => l !== layer);
+                        updateTreeControl();
+                    }
                 }
             };
         });
@@ -2336,4 +2392,328 @@ window.showSection = function(sectionId, btnId) {
     if (sectionId === 'mapSection') {
         applyViewerMapRestrictions();
     }
+};
+
+// ==========================================
+// NEW REFERENCE MAPS (BASE MAPS) LOGIC
+// ==========================================
+
+window.loadGlobalRefMaps = async function() {
+    const q = query(collection(db, "global_reference_maps"));
+    const snapshot = await getDocs(q);
+    
+    globalRefMapsData = {};
+    const refMapsList = document.getElementById("refMapsList");
+    const adminRefMapsList = document.getElementById("adminRefMapsList");
+    
+    // Admin ට පමණක් Manage Maps බටන් එක පෙන්වීම
+    let adminBtnHtml = isAdmin ? `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-primary fw-bold" type="button" data-bs-toggle="modal" data-bs-target="#manageRefMapsModal"><i class="bi bi-gear-fill me-2"></i>Manage Maps</button></li>` : '';
+    let dropdownHtml = '';
+    let adminListHtml = '';
+
+    snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+        globalRefMapsData[id] = data;
+
+        let isChecked = activeGlobalRefLayers[id] ? "checked" : "";
+
+        dropdownHtml += `
+            <li class="px-2 py-1">
+                <div class="form-check">
+                    <input class="form-check-input ref-map-checkbox" type="checkbox" value="${id}" id="refMap_${id}" ${isChecked} onchange="toggleRefMap('${id}', this)">
+                    <label class="form-check-label small" for="refMap_${id}">${escapeHtml(data.name)}</label>
+                </div>
+            </li>
+        `;
+
+        adminListHtml += `
+            <li class="list-group-item d-flex justify-content-between align-items-center p-2 small">
+                ${escapeHtml(data.name)}
+                <div>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="editRefMapStyle('${id}', '${escapeHtml(data.name)}')"><i class="bi bi-palette-fill"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteRefMap('${id}')"><i class="bi bi-trash"></i></button>
+                </div>
+            </li>
+        `;
+    });
+
+    if (refMapsList) refMapsList.innerHTML = dropdownHtml + adminBtnHtml;
+    if (adminRefMapsList) adminRefMapsList.innerHTML = adminListHtml || '<li class="list-group-item text-muted small">No reference maps found.</li>';
+};
+
+window.toggleRefMap = function(id, checkbox) {
+    if (checkbox.checked) {
+        if (activeGlobalRefLayers[id]) return;
+        try {
+            const geojson = JSON.parse(globalRefMapsData[id].geoJson);
+            const layerGroup = L.geoJSON(geojson, {
+                style: function(feature) {
+                    return { color: feature.properties.color || '#e67e22', weight: feature.properties.weight || 3, opacity: 0.8 };
+                },
+                pointToLayer: function(feature, latlng) {
+                    let c = feature.properties.color || '#e67e22';
+                    let style = feature.properties.iconStyle || 'circle';
+                    return L.marker(latlng, { icon: createCustomIcon(c, style) });
+                },
+                onEachFeature: function(f, l) {
+                    if(!l.feature) l.feature = f;
+                    bindFeaturePopup(l, l.feature, !isAdmin, globalRefMapsData[id].name, id);
+                }
+            });
+            if (projectMap) layerGroup.addTo(projectMap);
+            activeGlobalRefLayers[id] = layerGroup;
+        } catch (e) { console.error("Error rendering ref map", e); }
+    } else {
+        if (activeGlobalRefLayers[id]) {
+            if (projectMap) projectMap.removeLayer(activeGlobalRefLayers[id]);
+            delete activeGlobalRefLayers[id];
+        }
+    }
+};
+
+document.getElementById('uploadRefMapBtn')?.addEventListener('click', async () => {
+    if (!isAdmin) return;
+    const name = document.getElementById('newRefMapName').value.trim();
+    const fileInput = document.getElementById('newRefMapFile');
+    const file = fileInput.files[0];
+    const status = document.getElementById('uploadRefMapStatus');
+
+    if (!name || !file) {
+        if(status) {
+            status.className = "small mt-2 text-danger";
+            status.innerText = "Please provide a name and select a KMZ/KML file.";
+        }
+        return;
+    }
+
+    if(status) {
+        status.className = "small mt-2 text-info";
+        status.innerText = "Processing file... Please wait.";
+    }
+
+    const fileUrl = URL.createObjectURL(file);
+    let tempParser = L.kmzLayer();
+    
+    tempParser.on('load', async function(event) {
+        let features = [];
+        event.layer.eachLayer(function(l) {
+            if(l.toGeoJSON) features.push(l.toGeoJSON());
+        });
+        let fc = { type: "FeatureCollection", features: features };
+
+        try {
+            await addDoc(collection(db, "global_reference_maps"), {
+                name: name,
+                geoJson: JSON.stringify(fc),
+                addedBy: currentUserEmail,
+                createdAt: new Date().toISOString()
+            });
+            if(status) {
+                status.className = "small mt-2 text-success";
+                status.innerText = "Reference map added successfully!";
+            }
+            if(document.getElementById('newRefMapName')) document.getElementById('newRefMapName').value = '';
+            if(fileInput) fileInput.value = '';
+            window.loadGlobalRefMaps();
+        } catch (error) {
+            if(status) {
+                status.className = "small mt-2 text-danger";
+                status.innerText = "Error saving map: " + error.message;
+            }
+        }
+    });
+    tempParser.load(fileUrl);
+});
+
+window.deleteRefMap = async function(id) {
+    if (!isAdmin) return;
+    if (confirm("Are you sure you want to delete this reference map?")) {
+        try {
+            await deleteDoc(doc(db, "global_reference_maps", id));
+            if (activeGlobalRefLayers[id]) {
+                if (projectMap) projectMap.removeLayer(activeGlobalRefLayers[id]);
+                delete activeGlobalRefLayers[id];
+            }
+            window.loadGlobalRefMaps();
+        } catch (error) {
+            alert("Error deleting map: " + error.message);
+        }
+    }
+};
+
+
+
+// --- Bulk Edit Folder Style Function ---
+window.editFolderStyle = function(e, folderName) {
+    if (isViewer()) return;
+    e.stopPropagation(); 
+    e.preventDefault();
+
+    // කලින් Modal එකක් තිබ්බොත් අයින් කරන්න
+    let existingModal = document.getElementById('folderStyleModal');
+    if (existingModal) existingModal.remove();
+
+    // HTML Modal එක Dynamic විදිහට හදනවා
+    let modalHtml = `
+    <div class="modal fade" id="folderStyleModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-palette-fill me-2"></i>Style: ${escapeHtml(folderName)}</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Color:</label>
+                        <input type="color" id="bulkFolderColor" class="form-control form-control-color w-100" value="#3388ff">
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Line Size / Icon Size:</label>
+                        <input type="number" id="bulkFolderWeight" class="form-control" value="3" min="1" max="15">
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Icon Style (Markers only):</label>
+                        <select id="bulkFolderIcon" class="form-select">
+                            <option value="circle">Circle</option>
+                            <option value="square">Square</option>
+                            <option value="pin">Pin</option>
+                            <option value="star">Star</option>
+                        </select>
+                    </div>
+                    <button id="applyFolderStyleBtn" class="btn btn-success w-100 fw-bold"><i class="bi bi-check2-circle me-1"></i>Apply to All Items</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    let modalEl = document.getElementById('folderStyleModal');
+    let modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    // Apply බටන් එක එබුවම වෙන දේ
+    document.getElementById('applyFolderStyleBtn').onclick = function() {
+        let newColor = document.getElementById('bulkFolderColor').value;
+        let newWeight = parseInt(document.getElementById('bulkFolderWeight').value) || 3;
+        let newIconStyle = document.getElementById('bulkFolderIcon').value;
+        let updatedCount = 0;
+
+        currentStageLayers.forEach(layer => {
+            if (layer.feature && layer.feature.properties && layer.feature.properties.folder === folderName) {
+                // Properties අප්ඩේට් කිරීම
+                layer.feature.properties.color = newColor;
+                layer.feature.properties.weight = newWeight;
+                
+                // Map එකේ ඇඳලා තියෙන ලේයර් එකේ පාට වෙනස් කිරීම (Lines/Polygons)
+                if (layer.setStyle) {
+                    layer.setStyle({color: newColor, weight: newWeight});
+                }
+                // Point එකක් නම් (Marker) Icon එක වෙනස් කිරීම
+                if (layer instanceof L.Marker) {
+                    layer.feature.properties.iconStyle = newIconStyle;
+                    layer.setIcon(createCustomIcon(newColor, newIconStyle));
+                }
+                updatedCount++;
+            }
+        });
+
+        modal.hide();
+        alert(`සාර්ථකයි! අයිතම ${updatedCount} ක Style වෙනස් කරන ලදී. (Save Map බොත්තම ඔබා Save කරගන්න)`);
+        
+        // ගස් ව්‍යූහය (Tree) යාවත්කාලීන කිරීම
+        if(typeof window.updateTreeControl === 'function') {
+            window.updateTreeControl();
+        }
+    };
+};
+
+// --- Edit Reference Map Style Function ---
+window.editRefMapStyle = function(id, mapName) {
+    if (!isAdmin) return;
+    
+    // කලින් Modal එකක් තිබ්බොත් අයින් කරනවා
+    let existingModal = document.getElementById('refMapStyleModal');
+    if (existingModal) existingModal.remove();
+
+    // අලුත් Style Modal එක
+    let modalHtml = `
+    <div class="modal fade" id="refMapStyleModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-palette-fill me-2"></i>Style: ${escapeHtml(mapName)}</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Color:</label>
+                        <input type="color" id="refMapBulkColor" class="form-control form-control-color w-100" value="#e67e22">
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Line Size / Icon Size:</label>
+                        <input type="number" id="refMapBulkWeight" class="form-control" value="3" min="1" max="15">
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Icon Style (Markers only):</label>
+                        <select id="refMapBulkIcon" class="form-select">
+                            <option value="circle">Circle</option>
+                            <option value="square">Square</option>
+                            <option value="pin">Pin</option>
+                            <option value="star">Star</option>
+                        </select>
+                    </div>
+                    <button id="applyRefMapStyleBtn" class="btn btn-success w-100 fw-bold"><i class="bi bi-cloud-arrow-up-fill me-1"></i>Update & Save</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    let modalEl = document.getElementById('refMapStyleModal');
+    let modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    document.getElementById('applyRefMapStyleBtn').onclick = async function() {
+        let newColor = document.getElementById('refMapBulkColor').value;
+        let newWeight = parseInt(document.getElementById('refMapBulkWeight').value) || 3;
+        let newIconStyle = document.getElementById('refMapBulkIcon').value;
+        
+        try {
+            // Database එකේ තියෙන GeoJSON එක අරගෙන ඒකෙ තියෙන ඔක්කොම Features වලට අලුත් Style එක දානවා
+            let geoJsonObj = JSON.parse(globalRefMapsData[id].geoJson);
+            
+            if(geoJsonObj && geoJsonObj.features) {
+                geoJsonObj.features.forEach(f => {
+                    if(!f.properties) f.properties = {};
+                    f.properties.color = newColor;
+                    f.properties.weight = newWeight;
+                    f.properties.iconStyle = newIconStyle;
+                });
+            }
+            
+            let updatedGeoJsonStr = JSON.stringify(geoJsonObj);
+            
+            // අලුත් GeoJSON එක Database එකට Save කරනවා
+            await updateDoc(doc(db, "global_reference_maps", id), { 
+                geoJson: updatedGeoJsonStr 
+            });
+            
+            globalRefMapsData[id].geoJson = updatedGeoJsonStr;
+            
+            // Map එකේ මේ Ref Map එක On කරලා නම් තියෙන්නේ, ඒක අලුත් පාටින් ආයේ ලෝඩ් කරනවා
+            let checkbox = document.getElementById('refMap_' + id);
+            if (checkbox && checkbox.checked && activeGlobalRefLayers[id]) {
+                projectMap.removeLayer(activeGlobalRefLayers[id]);
+                delete activeGlobalRefLayers[id];
+                window.toggleRefMap(id, checkbox);
+            }
+            
+            modal.hide();
+            alert("Reference Map එකේ Style එක සාර්ථකව යාවත්කාලීන කළා!");
+            
+        } catch (error) {
+            alert("Style update failed: " + error.message);
+        }
+    };
 };

@@ -513,11 +513,25 @@
                                 <option value="FINAL">FINAL</option>
                             </select>
                         </div>
+                        
+                        <!-- NEW: Reference Maps Dropdown (Pre-installed Maps) -->
                         <div>
+                            <label class="form-label small fw-bold text-muted mb-1 d-block">Ref Maps</label>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle bg-white border" type="button" id="refMapsDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                                    <i class="bi bi-map"></i> Base Maps
+                                </button>
+                                <ul class="dropdown-menu p-2 shadow-sm" aria-labelledby="refMapsDropdown" style="min-width: 220px; max-height: 300px; overflow-y: auto;" id="refMapsList">
+                                    <!-- Global maps loaded here -->
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="admin-only-map-tools">
                             <label class="form-label small fw-bold text-muted mb-1 d-block">Upload KMZ</label>
                             <input type="file" id="kmzUpload" accept=".kmz,.kml" class="form-control form-control-sm" style="max-width: 190px;">
                         </div>
-                        <button id="saveMapBtn" class="btn btn-sm btn-success fw-bold"><i class="bi bi-cloud-arrow-up-fill me-1"></i> Save Map</button>
+                        <button id="saveMapBtn" class="btn btn-sm btn-success fw-bold admin-only-map-tools"><i class="bi bi-cloud-arrow-up-fill me-1"></i> Save Map</button>
                         <button type="button" class="btn btn-sm btn-outline-dark fw-bold" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="bi bi-download me-1"></i> Export Data</button>
                     </div>
                 </div>
@@ -528,6 +542,32 @@
                 </div>
             </div>
             
+            <!-- Manage Reference Maps Modal (Admin Only) -->
+            <div class="modal fade" id="manageRefMapsModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-dark text-white">
+                            <h5 class="modal-title fw-bold">Manage Reference Maps</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-primary">Add New Map (KMZ/KML)</h6>
+                                <input type="text" id="newRefMapName" class="form-control form-control-sm mb-2" placeholder="Map Name (e.g., Road Network)">
+                                <input type="file" id="newRefMapFile" accept=".kmz,.kml" class="form-control form-control-sm mb-2">
+                                <button type="button" id="uploadRefMapBtn" class="btn btn-sm btn-success w-100 fw-bold">Upload & Save Map</button>
+                                <div id="uploadRefMapStatus" class="small mt-2" role="status"></div>
+                            </div>
+                            <hr>
+                            <h6 class="fw-bold text-secondary">Existing Reference Maps</h6>
+                            <ul class="list-group list-group-flush" id="adminRefMapsList">
+                                <!-- Admin maps load here -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Export Modal -->
             <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
